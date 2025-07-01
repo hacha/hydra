@@ -10,7 +10,6 @@ export default ({ content, header }, state, emit) => {
   <div id="modal">
     <div id="modal-header" style="opacity:${state.showUI === true ? 1 : 0}">
      ${header}
-      ${toolbar(state, emit)}
     </div>
     <div id="modal-body">
      ${content}
