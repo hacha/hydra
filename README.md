@@ -246,6 +246,38 @@ run dev environment
 npm dev
 ```
 
+## Running with Docker
+
+This project includes Docker configuration for both development and production environments.
+
+### Prerequisites
+- Docker and Docker Compose installed on your machine
+
+### Development Environment (Default)
+To run the development environment with hot-reloading:
+```bash
+docker-compose up -d
+```
+This will start the development server on http://localhost
+
+### Production Environment
+To build and run the production version:
+```bash
+docker-compose --profile prod up -d
+```
+This will build the application and serve it via Nginx on http://localhost
+
+### Building the Docker Image
+To build the Docker image separately:
+```bash
+docker build -t hydra-app .
+```
+
+### Notes
+- The development environment uses volume mounting for hot-reloading
+- The production build uses multi-stage Docker build for optimal image size
+- Nginx is configured with gzip compression and proper caching headers
+
 ## Connecting to server from dev/ local editor environment
 This repo only contains hydra editor frontend. You can connect to a backend server (https://github.com/hydra-synth/hydra-server) for signaling and gallery functionality. To do this, set up hydra-server from above. Then create a `.env` file in the root of the `hydra` directory. Add the url of your server as a line in the .env file as:
 ```

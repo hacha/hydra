@@ -1,0 +1,51 @@
+# 依存関係
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ビルド出力
+dist/
+build/
+
+# 開発ツール
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS関連
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+.dockerignore
+Dockerfile*
+docker-compose*.yml
+
+# ドキュメント
+README.md
+docs/
+
+# テスト関連
+coverage/
+.nyc_output/
+
+# 環境変数
+.env
+.env.local
+.env.*.local
+
+# ログ
+logs/
+*.log
+
+# その他
+.cache/
+.temp/
+.tmp/

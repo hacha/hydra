@@ -1,0 +1,41 @@
+services:
+  # デフォルト（開発環境）
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "80:5173"
+    environment:
+      - NODE_ENV=development
+    command: npm run dev
+
+  # プロダクション環境用サービス
+  prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    environment:
+      - NODE_ENV=production
+    profiles:
+      - prod
+
+  # プロダクション環境（HTTPSあり）
+  prod-https:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
+    environment:
+      - NODE_ENV=production
+    profiles:
+      - prod-https
