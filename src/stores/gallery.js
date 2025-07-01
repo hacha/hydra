@@ -128,7 +128,7 @@ export default class Gallery {
       this.code = this.decodeBase64(base64Code)
       this.foundSketch = true
     } else {
-      this.setRandomSketch()
+      // this.setRandomSketch()
     }
     callback(this.code, this.foundSketch)
   }
