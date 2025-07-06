@@ -52,7 +52,7 @@ export default class Editor extends EventEmitter {
   }
 
   getValue() {
-    this.cm.state.doc.toString()
+    return this.cm.state.doc.toString()
   }
 
   formatCode() {

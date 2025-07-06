@@ -129,6 +129,8 @@ export default class Gallery {
       this.foundSketch = true
     } else {
       // this.setRandomSketch()
+      this.code = '' // 空のコードで初期化
+      this.foundSketch = false
     }
     callback(this.code, this.foundSketch)
   }

@@ -10,6 +10,7 @@ export default ({ content, header }, state, emit) => {
   <div id="modal">
     <div id="modal-header" style="opacity:${state.showUI === true ? 1 : 0}">
      ${header}
+     <i class="fas fa-times icon" style="float: right; cursor: pointer; margin-right: 10px;" onclick=${() => emit('ui: toggle info')} aria-hidden="true"></i>
     </div>
     <div id="modal-body">
      ${content}

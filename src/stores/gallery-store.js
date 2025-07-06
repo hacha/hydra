@@ -9,7 +9,8 @@ export default function galleryStore(state, emitter) {
           if(sketchFromURL) {
             emitter.emit('ui: hide info')
           } else {
-            emitter.emit('ui: show info')
+            // emitter.emit('ui: show info')  // モーダルを表示しない
+            emitter.emit('ui: hide info')
           }
           emitter.emit('render')
           // @todo create gallery store
@@ -17,6 +18,12 @@ export default function galleryStore(state, emitter) {
         }, state, emitter)
     
         state.gallery = sketches
+        // save to url
+        emitter.on('gallery: save to URL', function (code) {
+          // let editor = state.editor.editor
+          // const editorText = editor.getValue()
+          sketches.saveLocally(code)
+        })
       })
 
       // redundant with below
@@ -25,13 +32,6 @@ export default function galleryStore(state, emitter) {
       //   const editorText = editor.getValue()
       //   sketches.saveLocally(editorText)
       // }) 
-      
-      // save to url
-      emitter.on('gallery: save to URL', function (code) {
-        // let editor = state.editor.editor
-        // const editorText = editor.getValue()
-        sketches.saveLocally(code)
-      }) 
 
       emitter.on('gallery: clear', () => {
         sketches.clear()
