@@ -16,14 +16,39 @@
  <script src="%VITE_HYDRA_SYNTH_URL%"></script>
 
  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/gh/atfornes/Hydra-strudel-extension@latest/hydra-strudel.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/atfornes/Hydra-strudel-extension@latest/hydra-strudel.js" defer></script>
  <!-- <script src="./bundle.js?1.2wsdajk" defer></script>  -->
  <script src="./index.js" defer type="module"></script>
 <script>
-  window.addEventListener('load', async () => {
-    if (typeof initHydraStrudel === 'function') {
-      await initHydraStrudel();
-    }
+  // Track hydra-strudel initialization state
+  window._hydraStrudelReady = false;
+  
+  // Wait for both hydra and strudel to be loaded
+  window.addEventListener('DOMContentLoaded', () => {
+    const checkHydraAndInitStrudel = () => {
+      if (window.hydraSynth && typeof initHydraStrudel === 'function') {
+        console.log('Initializing hydra-strudel...');
+        initHydraStrudel().then(() => {
+          console.log('hydra-strudel initialized successfully');
+          window._hydraStrudelReady = true;
+          // Emit custom event to signal readiness
+          window.dispatchEvent(new Event('hydra-strudel-ready'));
+        }).catch(err => {
+          console.error('Failed to initialize hydra-strudel:', err);
+        });
+      } else {
+        // Retry after a short delay
+        setTimeout(checkHydraAndInitStrudel, 100);
+      }
+    };
+    
+    // Listen for hydra loaded event or check after delay
+    window.addEventListener('hydra loaded', () => {
+      checkHydraAndInitStrudel();
+    });
+    
+    // Also check after a delay in case the event was already fired
+    setTimeout(checkHydraAndInitStrudel, 500);
   });
 </script> 
  <link href="https://fonts.googleapis.com/css?family=Chivo:300,400,700" rel="stylesheet"> 

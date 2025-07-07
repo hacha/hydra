@@ -5,16 +5,37 @@ export default function galleryStore(state, emitter) {
     emitter.on('DOMContentLoaded', function () {
    
         sketches = new Gallery((code, sketchFromURL) => {
-          emitter.emit('load and eval code', code, false)
-          if(sketchFromURL) {
-            emitter.emit('ui: hide info')
+          // Check if hydra-strudel is ready before evaluating code
+          const evalCode = () => {
+            emitter.emit('load and eval code', code, false)
+            if(sketchFromURL) {
+              emitter.emit('ui: hide info')
+            } else {
+              // emitter.emit('ui: show info')  // モーダルを表示しない
+              emitter.emit('ui: hide info')
+            }
+            emitter.emit('render')
+          };
+          
+          // If code contains strudel functions, wait for initialization
+          if (code && (code.includes('strudel') || code.includes('mini') || code.includes('P('))) {
+            if (window._hydraStrudelReady) {
+              evalCode();
+            } else {
+              // Wait for hydra-strudel to be ready
+              window.addEventListener('hydra-strudel-ready', evalCode, { once: true });
+              // Also set a timeout fallback
+              setTimeout(() => {
+                if (!window._hydraStrudelReady) {
+                  console.warn('hydra-strudel initialization timeout, executing code anyway');
+                  evalCode();
+                }
+              }, 3000);
+            }
           } else {
-            // emitter.emit('ui: show info')  // モーダルを表示しない
-            emitter.emit('ui: hide info')
+            // No strudel functions, execute immediately
+            evalCode();
           }
-          emitter.emit('render')
-          // @todo create gallery store
-        //  console.warn('gallery callback not let implemented')
         }, state, emitter)
     
         state.gallery = sketches
