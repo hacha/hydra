@@ -51,6 +51,8 @@ export default class Editor extends EventEmitter {
         this.formatCode()
       } else if (e == 'gallery:saveToURL') {
         this.emit('editor: save to URL', this.cm.getValue())
+      } else if (e == 'tap-tempo: tap' || e == 'tap-tempo: toggle') {
+        this.emit(e)
       } else {
         this.emit(e, this)
       }

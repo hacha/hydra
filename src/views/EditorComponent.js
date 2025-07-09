@@ -3,7 +3,7 @@
 import html from 'choo/html'
 import Component from 'choo/component'
 import HydraEditor from './editor/editor.js'
-// import HydraEditor from './editor-cm6/editor.js'
+// import HydraEditor from './cm6-editor/editor.js'
 import log from './editor/log.js'
 
 export default class Editor extends Component {

@@ -11,5 +11,7 @@ export default {
     'Shift-Ctrl-s': 'screencap',
     'Ctrl--': 'editor:zoomOut',
     'Ctrl-=': 'editor:zoomIn',
-    'Ctrl-S': 'editor:saveToLocalStorage'
+    'Ctrl-S': 'editor:saveToLocalStorage',
+    'Ctrl-t': 'tap-tempo:tap',
+    'Shift-Ctrl-t': 'tap-tempo:toggle'
 }
