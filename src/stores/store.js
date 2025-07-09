@@ -45,6 +45,10 @@ class TapTempo {
     }
     
     const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length
+    
+    // Ignore unrealistic intervals (< 100ms = 600+ BPM)
+    if (avgInterval < 100) return
+    
     const calculatedBPM = 60000 / avgInterval
     
     // Clamp BPM to reasonable range
@@ -207,11 +211,6 @@ export default function store(state, emitter) {
 
   emitter.on('tap-tempo:toggle', () => {
     state.tapTempo.toggleVisibility()
-    emitter.emit('render')
-  })
-
-  emitter.on('tap-tempo: reset', () => {
-    state.tapTempo.reset()
     emitter.emit('render')
   })
 
