@@ -1,11 +1,12 @@
 //'use babel'
 
 // const p5lib = require('p5')
+import config from './config.js'
 
 export default class P5 extends p5{
   constructor ({
-    width = 1920,
-    height = 1080,
+    width = config.resolution.width,
+    height = config.resolution.height,
     mode = 'P2D'
   } = {}) {
     //console.log('createing canvas', width, height, window.innerWidth, window.innerHeight)

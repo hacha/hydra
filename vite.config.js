@@ -24,6 +24,10 @@ export default defineConfig(({ mode }) => {
         ? '/favicon.png'
         : 'https://cdn.glitch.com/597fe374-3d18-46a5-b99c-ceff1f8ffd79%2Ffavicon.png?1530891352785'
     
+    // Default resolution settings
+    const defaultWidth = '1920'
+    const defaultHeight = '1080'
+    
     return {
         base: '',
         define: {
@@ -34,6 +38,9 @@ export default defineConfig(({ mode }) => {
             'VITE_HYDRA_STRUDEL_URL': JSON.stringify(process.env.VITE_HYDRA_STRUDEL_URL || defaultHydraStrudelUrl),
             'VITE_FONT_URL': JSON.stringify(process.env.VITE_FONT_URL || defaultFontUrl),
             'VITE_FAVICON_URL': JSON.stringify(process.env.VITE_FAVICON_URL || defaultFaviconUrl),
+            // Resolution settings
+            'VITE_DEFAULT_WIDTH': JSON.stringify(process.env.VITE_DEFAULT_WIDTH || defaultWidth),
+            'VITE_DEFAULT_HEIGHT': JSON.stringify(process.env.VITE_DEFAULT_HEIGHT || defaultHeight),
         },
         optimizeDeps: {
             esbuildOptions: {
