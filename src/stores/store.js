@@ -199,13 +199,13 @@ export default function store(state, emitter) {
   })
 
   // Tap tempo event handlers
-  emitter.on('tap-tempo: tap', () => {
+  emitter.on('tap-tempo:tap', () => {
     state.tapTempo.addTap()
     state.tapTempo.resetFadeTimeout(emitter)
     emitter.emit('render')
   })
 
-  emitter.on('tap-tempo: toggle', () => {
+  emitter.on('tap-tempo:toggle', () => {
     state.tapTempo.toggleVisibility()
     emitter.emit('render')
   })

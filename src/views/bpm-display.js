@@ -1,7 +1,7 @@
 import html from 'choo/html'
 
 export default function bpmDisplay(state, emit) {
-  if (!state.tapTempo.isVisible) return html``
+  if (!state.tapTempo?.isVisible) return html``
   
   const className = state.tapTempo.isFading ? 'fade-out' : ''
   
