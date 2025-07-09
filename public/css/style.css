@@ -2,7 +2,8 @@
   background-color: #f00;
 }*/
 
-html, body {
+html,
+body {
   background: #000;
   margin: 0px;
   padding: 0px;
@@ -12,12 +13,13 @@ html, body {
   line-height: 1.4;
 }
 
-.camera-inputs{
+.camera-inputs {
   color: black;
   background: white;
 }
+
 textarea {
-    background: #000;
+  background: #000;
 }
 
 canvas {
@@ -43,7 +45,7 @@ a:hover {
 }
 
 #code {
-    z-index: 5;
+  z-index: 5;
 }
 
 #hydra-canvas {
@@ -109,16 +111,18 @@ a:hover {
 
 #bpm-display {
   position: fixed;
-  bottom: 15px;
-  right: 15px;
+  bottom: 14px;
+  left: 10px;
   z-index: 10;
-  background: rgba(0, 0, 0, 0.3);
-  color: rgba(255, 255, 255, 0.7);
-  padding: 8px 12px;
-  font-family: 'Chivo', sans-serif;
-  font-size: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
+  color: rgba(255, 255, 255, .7);
+  padding: 3px 6px;
+  font-family: monospace;
+  font-size: 10px;
   pointer-events: none;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.2s ease;
+  opacity: .8;
+}
+
+#bpm-display.fade-out {
+  opacity: 0;
 }

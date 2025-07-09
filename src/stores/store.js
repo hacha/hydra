@@ -11,6 +11,8 @@ class TapTempo {
     this.isVisible = false
     this.lastTap = 0
     this.fadeTimeout = null
+    this.isFading = false
+    this.fadeDelay = 500 // .5 second delay before fade
   }
 
   addTap() {
@@ -31,7 +33,7 @@ class TapTempo {
     }
     
     this.isVisible = true
-    this.resetFadeTimeout()
+    this.isFading = false
   }
 
   calculateBPM() {
@@ -49,13 +51,22 @@ class TapTempo {
     this.bpm = Math.max(30, Math.min(300, Math.round(calculatedBPM)))
   }
 
-  resetFadeTimeout() {
+  resetFadeTimeout(emitter) {
     if (this.fadeTimeout) {
       clearTimeout(this.fadeTimeout)
     }
     this.fadeTimeout = setTimeout(() => {
-      this.isVisible = false
-    }, this.timeout)
+      this.isFading = true
+      // Trigger re-render to apply fade class
+      if (emitter) emitter.emit('render')
+      
+      // Hide completely after fade animation
+      setTimeout(() => {
+        this.isVisible = false
+        this.isFading = false
+        if (emitter) emitter.emit('render')
+      }, 300) // Match CSS transition duration
+    }, this.fadeDelay)
   }
 
   reset() {
@@ -190,6 +201,7 @@ export default function store(state, emitter) {
   // Tap tempo event handlers
   emitter.on('tap-tempo: tap', () => {
     state.tapTempo.addTap()
+    state.tapTempo.resetFadeTimeout(emitter)
     emitter.emit('render')
   })
 
