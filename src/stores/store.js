@@ -1,12 +1,89 @@
 import repl from './repl-v2.js'
 // console.log('ENVIRONMENT IS', process.env.NODE_ENV)
 
+// TapTempo class for BPM calculation
+class TapTempo {
+  constructor() {
+    this.taps = []
+    this.maxTaps = 8
+    this.timeout = 3000 // 3 seconds
+    this.bpm = 120
+    this.isVisible = false
+    this.lastTap = 0
+    this.fadeTimeout = null
+  }
+
+  addTap() {
+    const now = Date.now()
+    this.taps.push(now)
+    this.lastTap = now
+    
+    // Remove old taps outside timeout window
+    this.taps = this.taps.filter(tap => now - tap < this.timeout)
+    
+    // Keep only maxTaps recent taps
+    if (this.taps.length > this.maxTaps) {
+      this.taps = this.taps.slice(-this.maxTaps)
+    }
+    
+    if (this.taps.length >= 2) {
+      this.calculateBPM()
+    }
+    
+    this.isVisible = true
+    this.resetFadeTimeout()
+  }
+
+  calculateBPM() {
+    if (this.taps.length < 2) return
+    
+    const intervals = []
+    for (let i = 1; i < this.taps.length; i++) {
+      intervals.push(this.taps[i] - this.taps[i - 1])
+    }
+    
+    const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length
+    const calculatedBPM = 60000 / avgInterval
+    
+    // Clamp BPM to reasonable range
+    this.bpm = Math.max(30, Math.min(300, Math.round(calculatedBPM)))
+  }
+
+  resetFadeTimeout() {
+    if (this.fadeTimeout) {
+      clearTimeout(this.fadeTimeout)
+    }
+    this.fadeTimeout = setTimeout(() => {
+      this.isVisible = false
+    }, this.timeout)
+  }
+
+  reset() {
+    this.taps = []
+    this.bpm = 120
+    this.isVisible = false
+    if (this.fadeTimeout) {
+      clearTimeout(this.fadeTimeout)
+    }
+  }
+
+  toggleVisibility() {
+    this.isVisible = !this.isVisible
+    if (this.isVisible) {
+      this.resetFadeTimeout()
+    }
+  }
+}
+
 export default function store(state, emitter) {
   state.showInfo = false
   state.showUI = true
   state.showExtensions = false
   state.errorMessage = ''
   state.isError = false
+  
+  // Initialize tap tempo
+  state.tapTempo = new TapTempo()
 
   // if backend gallery endpoint supplied, then enable gallery functionality
   const SERVER_URL = import.meta.env.VITE_SERVER_URL
@@ -110,7 +187,21 @@ export default function store(state, emitter) {
     emitter.emit('render')
   })
 
+  // Tap tempo event handlers
+  emitter.on('tap-tempo: tap', () => {
+    state.tapTempo.addTap()
+    emitter.emit('render')
+  })
 
+  emitter.on('tap-tempo: toggle', () => {
+    state.tapTempo.toggleVisibility()
+    emitter.emit('render')
+  })
+
+  emitter.on('tap-tempo: reset', () => {
+    state.tapTempo.reset()
+    emitter.emit('render')
+  })
 
   // emitter.on('mutate sketch', function () {
 
