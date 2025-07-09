@@ -4,8 +4,8 @@
 
 export default class P5 extends p5{
   constructor ({
-    width = window.innerWidth,
-    height = window.innerHeight,
+    width = 1920,
+    height = 1080,
     mode = 'P2D'
   } = {}) {
     //console.log('createing canvas', width, height, window.innerWidth, window.innerHeight)

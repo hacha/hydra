@@ -49,7 +49,7 @@ export default class Editor extends Component {
     return false
   }
 
-  createElement ({ width = window.innerWidth, height = window.innerHeight} = {}) {
+  createElement ({ width = 1920, height = 1080} = {}) {
     this.textEl = html` <div></div>`
     this.logElement = html`<div class="console cm-s-tomorrow-night-eighties"></div>`
     return html`<div id="editor-container" style="display:flex;flex-direction:column;">
