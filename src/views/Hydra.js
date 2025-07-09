@@ -58,7 +58,7 @@ export default class HydraCanvas extends Component {
     return false
   }
 
-  createElement({ width = window.innerWidth, height = window.innerHeight } = {}) {
+  createElement({ width = 1920, height = 1080 } = {}) {
 
     return html`<div style="width:100%;height:100%;">
         <canvas id="hydra-canvas" class="bg-black" style="image-rendering:pixelated; width:100%;height:100%" width="${width}" height="${height}"></canvas></div>`
