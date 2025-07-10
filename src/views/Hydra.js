@@ -45,6 +45,10 @@ export default class HydraCanvas extends Component {
     }
 
     window.hydraSynth = this.hydra
+    
+    // Apply resolution from config after Hydra initialization
+    this.hydra.setResolution(config.resolution.width, config.resolution.height)
+    
     //  if(environment !== 'local') {
     // osc().out()
 

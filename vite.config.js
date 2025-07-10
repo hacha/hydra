@@ -38,9 +38,8 @@ export default defineConfig(({ mode }) => {
             'VITE_HYDRA_STRUDEL_URL': JSON.stringify(process.env.VITE_HYDRA_STRUDEL_URL || defaultHydraStrudelUrl),
             'VITE_FONT_URL': JSON.stringify(process.env.VITE_FONT_URL || defaultFontUrl),
             'VITE_FAVICON_URL': JSON.stringify(process.env.VITE_FAVICON_URL || defaultFaviconUrl),
-            // Resolution settings
-            'VITE_DEFAULT_WIDTH': JSON.stringify(process.env.VITE_DEFAULT_WIDTH || defaultWidth),
-            'VITE_DEFAULT_HEIGHT': JSON.stringify(process.env.VITE_DEFAULT_HEIGHT || defaultHeight),
+            // Resolution settings are now handled by import.meta.env
+            // Removing these to avoid confusion with the actual values from .env files
         },
         optimizeDeps: {
             esbuildOptions: {

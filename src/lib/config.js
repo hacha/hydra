@@ -1,11 +1,15 @@
 // Configuration utility for Hydra
 // Provides centralized access to configuration values
 
+// Use import.meta.env which is the standard Vite way
+const width = import.meta.env.VITE_DEFAULT_WIDTH ? parseInt(import.meta.env.VITE_DEFAULT_WIDTH, 10) : 1920;
+const height = import.meta.env.VITE_DEFAULT_HEIGHT ? parseInt(import.meta.env.VITE_DEFAULT_HEIGHT, 10) : 1080;
+
 export const config = {
   // Resolution configuration
   resolution: {
-    width: parseInt(VITE_DEFAULT_WIDTH, 10) || 1920,
-    height: parseInt(VITE_DEFAULT_HEIGHT, 10) || 1080
+    width: width,
+    height: height
   },
   
   // Helper method to get resolution object
