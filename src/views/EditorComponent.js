@@ -5,6 +5,7 @@ import Component from 'choo/component'
 import HydraEditor from './editor/editor.js'
 // import HydraEditor from './cm6-editor/editor.js'
 import log from './editor/log.js'
+import config from '../lib/config.js'
 
 export default class Editor extends Component {
   constructor (id, state, emit) {
@@ -48,7 +49,7 @@ export default class Editor extends Component {
     return false
   }
 
-  createElement ({ width = 1920, height = 1080} = {}) {
+  createElement ({ width = config.resolution.width, height = config.resolution.height} = {}) {
     this.textEl = html` <textarea></textarea>`
     this.logElement = html`<div class="console cm-s-tomorrow-night-eighties"></div>`
     return html`<div id="editor-container" style="display:flex;flex-direction:column;">

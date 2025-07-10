@@ -4,6 +4,7 @@ import Component from 'choo/component'
 // const HydraSynth = require('./../../../../../hydra-synth')
 import P5 from './../lib/p5-wrapper.js'
 import PatchBay from './../lib/patch-bay/pb-live.js'
+import config from './../lib/config.js'
 
 let pb
 
@@ -44,6 +45,10 @@ export default class HydraCanvas extends Component {
     }
 
     window.hydraSynth = this.hydra
+    
+    // Apply resolution from config after Hydra initialization
+    this.hydra.setResolution(config.resolution.width, config.resolution.height)
+    
     //  if(environment !== 'local') {
     // osc().out()
 
@@ -58,7 +63,7 @@ export default class HydraCanvas extends Component {
     return false
   }
 
-  createElement({ width = 1920, height = 1080 } = {}) {
+  createElement({ width = config.resolution.width, height = config.resolution.height } = {}) {
 
     return html`<div style="width:100%;height:100%;">
         <canvas id="hydra-canvas" class="bg-black" style="image-rendering:pixelated; width:100%;height:100%" width="${width}" height="${height}"></canvas></div>`
