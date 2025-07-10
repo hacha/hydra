@@ -1,6 +1,128 @@
 import repl from './repl-v2.js'
 // console.log('ENVIRONMENT IS', process.env.NODE_ENV)
 
+// MIDI Input class for handling MIDI devices
+class MidiInput {
+  constructor() {
+    this.note = new Array(128).fill(0) // MIDI note values (0-127)
+    this.cc = new Array(128).fill(0)   // Control Change values (0-127)
+    this.pitch = 0                     // Pitch bend value (-1 to 1)
+    this.velocity = new Array(128).fill(0) // Note velocity values (0-127)
+    this.isConnected = false
+    this.devices = []
+    this.inputs = []
+    this.outputs = []
+    this.activeNotes = new Set()
+    
+    // Initialize WebMIDI if available
+    this.init()
+  }
+  
+  async init() {
+    try {
+      if (navigator.requestMIDIAccess) {
+        const midiAccess = await navigator.requestMIDIAccess()
+        this.midiAccess = midiAccess
+        this.setupMIDIDevices()
+        this.isConnected = true
+        
+        // Listen for device connection/disconnection
+        midiAccess.addEventListener('statechange', (e) => {
+          this.setupMIDIDevices()
+        })
+        
+        console.log('MIDI initialized successfully')
+      } else {
+        console.warn('WebMIDI API not supported in this browser')
+      }
+    } catch (error) {
+      console.error('Failed to initialize MIDI:', error)
+    }
+  }
+  
+  setupMIDIDevices() {
+    if (!this.midiAccess) return
+    
+    this.inputs = Array.from(this.midiAccess.inputs.values())
+    this.outputs = Array.from(this.midiAccess.outputs.values())
+    this.devices = [...this.inputs, ...this.outputs]
+    
+    // Setup input listeners
+    this.inputs.forEach(input => {
+      input.addEventListener('midimessage', (e) => {
+        this.handleMIDIMessage(e)
+      })
+    })
+    
+    console.log(`MIDI devices: ${this.inputs.length} inputs, ${this.outputs.length} outputs`)
+  }
+  
+  handleMIDIMessage(event) {
+    const [status, note, velocity] = event.data
+    const command = status >> 4
+    const channel = status & 0x0f
+    
+    switch (command) {
+      case 9: // Note On
+        if (velocity > 0) {
+          this.note[note] = velocity / 127
+          this.velocity[note] = velocity / 127
+          this.activeNotes.add(note)
+        } else {
+          // Note on with velocity 0 is note off
+          this.note[note] = 0
+          this.velocity[note] = 0
+          this.activeNotes.delete(note)
+        }
+        break
+        
+      case 8: // Note Off
+        this.note[note] = 0
+        this.velocity[note] = 0
+        this.activeNotes.delete(note)
+        break
+        
+      case 11: // Control Change
+        this.cc[note] = velocity / 127
+        break
+        
+      case 14: // Pitch Bend
+        // Pitch bend combines note and velocity bytes
+        const pitchValue = (velocity << 7) | note
+        this.pitch = (pitchValue - 8192) / 8192 // Normalize to -1 to 1
+        break
+        
+      default:
+        // Handle other MIDI messages if needed
+        break
+    }
+  }
+  
+  // Get currently active notes
+  getActiveNotes() {
+    return Array.from(this.activeNotes)
+  }
+  
+  // Get note value by number
+  getNote(noteNumber) {
+    return this.note[noteNumber] || 0
+  }
+  
+  // Get CC value by number
+  getCC(ccNumber) {
+    return this.cc[ccNumber] || 0
+  }
+  
+  // Reset all MIDI values
+  reset() {
+    this.note.fill(0)
+    this.cc.fill(0)
+    this.velocity.fill(0)
+    this.pitch = 0
+    this.activeNotes.clear()
+  }
+}
+
 // TapTempo class for BPM calculation
 class TapTempo {
   constructor() {
@@ -99,6 +221,9 @@ export default function store(state, emitter) {
   
   // Initialize tap tempo
   state.tapTempo = new TapTempo()
+  
+  // Initialize MIDI input
+  state.midiInput = new MidiInput()
 
   // if backend gallery endpoint supplied, then enable gallery functionality
   const SERVER_URL = import.meta.env.VITE_SERVER_URL

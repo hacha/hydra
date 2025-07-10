@@ -56,6 +56,10 @@ export default class HydraCanvas extends Component {
 
     window.P5 = P5
     // window.pb = pb
+    
+    // Expose MIDI functionality globally
+    window.midi = this.state.midiInput
+    
     this.emit('hydra loaded')
   }
 
