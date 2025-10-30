@@ -168,27 +168,31 @@ class TapTempo {
     this.fadeTimeout = null
     this.isFading = false
     this.fadeDelay = 500 // .5 second delay before fade
+    this.manualToggle = false // Track if visibility was manually toggled
   }
 
   addTap() {
     const now = Date.now()
     this.taps.push(now)
     this.lastTap = now
-    
+
     // Remove old taps outside timeout window
     this.taps = this.taps.filter(tap => now - tap < this.timeout)
-    
+
     // Keep only maxTaps recent taps
     if (this.taps.length > this.maxTaps) {
       this.taps = this.taps.slice(-this.maxTaps)
     }
-    
+
     if (this.taps.length >= 2) {
       this.calculateBPM()
     }
-    
-    this.isVisible = true
-    this.isFading = false
+
+    // If not manually toggled, show temporarily with auto-fade
+    if (!this.manualToggle) {
+      this.isVisible = true
+      this.isFading = false
+    }
   }
 
   calculateBPM() {
@@ -211,6 +215,11 @@ class TapTempo {
   }
 
   resetFadeTimeout(emitter) {
+    // Don't auto-fade if manually toggled
+    if (this.manualToggle) {
+      return
+    }
+
     if (this.fadeTimeout) {
       clearTimeout(this.fadeTimeout)
     }
@@ -218,7 +227,7 @@ class TapTempo {
       this.isFading = true
       // Trigger re-render to apply fade class
       if (emitter) emitter.emit('render')
-      
+
       // Hide completely after fade animation
       setTimeout(() => {
         this.isVisible = false
@@ -239,8 +248,12 @@ class TapTempo {
 
   toggleVisibility() {
     this.isVisible = !this.isVisible
-    if (this.isVisible) {
-      this.resetFadeTimeout()
+    this.isFading = false
+    this.manualToggle = this.isVisible // Set manual toggle mode when visible
+    // Clear any pending fade timeout when manually toggling
+    if (this.fadeTimeout) {
+      clearTimeout(this.fadeTimeout)
+      this.fadeTimeout = null
     }
   }
 }
