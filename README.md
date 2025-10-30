@@ -30,9 +30,6 @@
 | `Ctrl-/` | コメントの切り替え |
 | `Shift-Ctrl-H` | UIの表示/非表示 |
 | `Shift-Ctrl-F` | コードのフォーマット |
-| `Shift-Ctrl-S` | スクリーンショットを保存 |
-| `Shift-Ctrl-G` | スケッチを共有（Twitter） |
-| `Shift-Ctrl-L` | スケッチをURLに保存 |
 
 ## このフォークでの変更点
 
