@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
     const defaultHeight = '1080'
 
     return {
-        base: '/hydra/',
+        base: isDevelopment ? '' : '/hydra/',
         server: {
             port: parseInt(process.env.VITE_PORT || '5173'),
             strictPort: false,
