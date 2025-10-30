@@ -95,7 +95,7 @@ export default function outputPreview(state, emit) {
   }
 
   // Start animation loop when preview is shown
-  setTimeout(startPreviewUpdate, 0)
+  requestAnimationFrame(startPreviewUpdate)
 
   return html`
     <div id="output-preview" style="
