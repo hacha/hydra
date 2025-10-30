@@ -16,8 +16,20 @@ app.use(galleryStore)
 
 app.use(languageStore)
 app.use(extensionStore)
-app.route('/', mainView)
-app.route('/dev', mainView)
+
+// 本番環境（GitHub Pages）では /hydra ベースパスを考慮
+const isProduction = import.meta.env.PROD
+
+if (isProduction) {
+  // GitHub Pagesでは末尾スラッシュの有無両方に対応
+  app.route('/hydra', mainView)
+  app.route('/hydra/', mainView)
+  app.route('/hydra/dev', mainView)
+} else {
+  app.route('/', mainView)
+  app.route('/dev', mainView)
+}
+
 app.mount('body')
 
 
