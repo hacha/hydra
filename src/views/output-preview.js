@@ -13,8 +13,8 @@ function updatePreviewCanvases() {
       const canvas = document.getElementById(canvasId)
       
       if (canvas && hydra.o && hydra.o[i] && hydra.regl) {
-        canvas.width = 160
-        canvas.height = 120
+        if (canvas.width !== 160) canvas.width = 160
+        if (canvas.height !== 120) canvas.height = 120
         
         const ctx = canvas.getContext('2d')
         
