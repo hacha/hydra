@@ -257,6 +257,9 @@ export default function store(state, emitter) {
   
   // Initialize MIDI input
   state.midiInput = new MidiInput()
+  
+  // Initialize output preview state
+  state.showOutputPreview = false
 
   // if backend gallery endpoint supplied, then enable gallery functionality
   const SERVER_URL = import.meta.env.VITE_SERVER_URL
@@ -371,6 +374,41 @@ export default function store(state, emitter) {
     state.tapTempo.toggleVisibility()
     emitter.emit('render')
   })
+
+  // Keyboard event handlers for Ctrl-V output preview
+  let isCtrlPressed = false
+  let isVPressed = false
+
+  function updatePreviewState() {
+    const shouldShow = isCtrlPressed && isVPressed
+    if (state.showOutputPreview !== shouldShow) {
+      state.showOutputPreview = shouldShow
+      emitter.emit('render')
+    }
+  }
+
+  // Set up global keyboard event listeners
+  if (typeof window !== 'undefined') {
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Control') {
+        isCtrlPressed = true
+        updatePreviewState()
+      } else if (event.key === 'v' || event.key === 'V') {
+        isVPressed = true
+        updatePreviewState()
+      }
+    })
+
+    window.addEventListener('keyup', (event) => {
+      if (event.key === 'Control') {
+        isCtrlPressed = false
+        updatePreviewState()
+      } else if (event.key === 'v' || event.key === 'V') {
+        isVPressed = false
+        updatePreviewState()
+      }
+    })
+  }
 
   // emitter.on('mutate sketch', function () {
 
