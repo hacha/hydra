@@ -65,9 +65,27 @@ class MidiInput {
   
   handleMIDIMessage(event) {
     const [status, note, velocity] = event.data
+
+    // Validate MIDI message data
+    if (status === undefined || note === undefined || velocity === undefined) {
+      console.warn('Invalid MIDI message: missing data')
+      return
+    }
+
+    // Validate note and velocity are within valid MIDI range (0-127)
+    if (note < 0 || note > 127) {
+      console.warn(`Invalid MIDI note value: ${note} (must be 0-127)`)
+      return
+    }
+
+    if (velocity < 0 || velocity > 127) {
+      console.warn(`Invalid MIDI velocity value: ${velocity} (must be 0-127)`)
+      return
+    }
+
     const command = status >> 4
     const channel = status & 0x0f
-    
+
     switch (command) {
       case 9: // Note On
         if (velocity > 0) {
