@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "vite build",
     "dev": "vite . --host ",
-    "publish": "git subtree push --prefix=dist origin gh-pages"
+    "publish": "gh-pages -d dist"
   },
   "author": "",
   "license": "AGPL",
@@ -37,6 +37,7 @@
     "browserify": "^17.0.0",
     "envify": "^4.1.0",
     "esmify": "^2.1.1",
+    "gh-pages": "^6.3.0",
     "http-server": "^14.1.1",
     "source-map-explorer": "^2.5.2",
     "terser": "^5.14.2",
