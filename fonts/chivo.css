@@ -1,0 +1,24 @@
+/* Chivo Font - Local version */
+@font-face {
+  font-family: 'Chivo';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('./chivo-300.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Chivo';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./chivo-400.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Chivo';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./chivo-700.ttf') format('truetype');
+}
