@@ -12,17 +12,40 @@ function updatePreviewCanvases() {
       const canvasId = `preview-o${i}`
       const canvas = document.getElementById(canvasId)
       
-      if (canvas && hydra.output && hydra.output[i]) {
-        const ctx = canvas.getContext('2d')
+      if (canvas && hydra.o && hydra.o[i] && hydra.regl) {
         canvas.width = 160
         canvas.height = 120
         
+        const ctx = canvas.getContext('2d')
+        
         try {
-          // Try to get the canvas content from hydra output
-          const outputCanvas = hydra.output[i].canvas || hydra.canvas
-          if (outputCanvas) {
-            // Draw the hydra output to our preview canvas
-            ctx.drawImage(outputCanvas, 0, 0, canvas.width, canvas.height)
+          // Get the framebuffer from the output
+          const fbo = hydra.o[i].getCurrent()
+          
+          if (fbo) {
+            // Read pixels from the framebuffer using regl
+            const pixels = hydra.regl.read({
+              framebuffer: fbo,
+              x: 0,
+              y: 0,
+              width: fbo.width,
+              height: fbo.height
+            })
+            
+            // Create ImageData from the pixels
+            const imageData = ctx.createImageData(fbo.width, fbo.height)
+            imageData.data.set(pixels)
+            
+            // Create a temporary canvas
+            const tempCanvas = document.createElement('canvas')
+            tempCanvas.width = fbo.width
+            tempCanvas.height = fbo.height
+            const tempCtx = tempCanvas.getContext('2d')
+            tempCtx.putImageData(imageData, 0, 0)
+            
+            // Draw directly without any flipping - regl.read() provides correctly oriented pixels
+            ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height)
+            
           } else {
             // Fallback: draw a placeholder
             ctx.fillStyle = '#222'
@@ -40,6 +63,7 @@ function updatePreviewCanvases() {
           ctx.font = '12px monospace'
           ctx.textAlign = 'center'
           ctx.fillText(`o${i}`, canvas.width/2, canvas.height/2)
+          console.error('Error rendering preview:', error)
         }
       }
     }
@@ -112,30 +136,7 @@ export default function outputPreview(state, emit) {
           padding: 1px 3px;
         ">o0</div>
       </div>
-      
-      <div class="preview-output" style="
-        background: #000;
-        border: 1px solid #444;
-        position: relative;
-        overflow: hidden;
-      ">
-        <canvas id="preview-o1" style="
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-        "></canvas>
-        <div style="
-          position: absolute;
-          top: 2px;
-          left: 2px;
-          color: white;
-          font-size: 10px;
-          font-family: monospace;
-          background: rgba(0,0,0,0.7);
-          padding: 1px 3px;
-        ">o1</div>
-      </div>
-      
+
       <div class="preview-output" style="
         background: #000;
         border: 1px solid #444;
@@ -157,6 +158,29 @@ export default function outputPreview(state, emit) {
           background: rgba(0,0,0,0.7);
           padding: 1px 3px;
         ">o2</div>
+      </div>
+
+      <div class="preview-output" style="
+        background: #000;
+        border: 1px solid #444;
+        position: relative;
+        overflow: hidden;
+      ">
+        <canvas id="preview-o1" style="
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+        "></canvas>
+        <div style="
+          position: absolute;
+          top: 2px;
+          left: 2px;
+          color: white;
+          font-size: 10px;
+          font-family: monospace;
+          background: rgba(0,0,0,0.7);
+          padding: 1px 3px;
+        ">o1</div>
       </div>
       
       <div class="preview-output" style="
