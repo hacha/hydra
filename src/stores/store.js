@@ -13,7 +13,10 @@ class MidiInput {
     this.inputs = []
     this.outputs = []
     this.activeNotes = new Set()
-    
+
+    // Bind handler for proper removal later
+    this.boundHandleMIDIMessage = this.handleMIDIMessage.bind(this)
+
     // Initialize WebMIDI if available
     this.init()
   }
@@ -42,18 +45,21 @@ class MidiInput {
   
   setupMIDIDevices() {
     if (!this.midiAccess) return
-    
+
+    // Clean up existing listeners before setting up new ones
+    this.inputs.forEach(input => {
+      input.removeEventListener('midimessage', this.boundHandleMIDIMessage)
+    })
+
     this.inputs = Array.from(this.midiAccess.inputs.values())
     this.outputs = Array.from(this.midiAccess.outputs.values())
     this.devices = [...this.inputs, ...this.outputs]
-    
-    // Setup input listeners
+
+    // Setup input listeners with bound handler
     this.inputs.forEach(input => {
-      input.addEventListener('midimessage', (e) => {
-        this.handleMIDIMessage(e)
-      })
+      input.addEventListener('midimessage', this.boundHandleMIDIMessage)
     })
-    
+
     console.log(`MIDI devices: ${this.inputs.length} inputs, ${this.outputs.length} outputs`)
   }
   
@@ -120,6 +126,15 @@ class MidiInput {
     this.velocity.fill(0)
     this.pitch = 0
     this.activeNotes.clear()
+  }
+
+  // Clean up event listeners to prevent memory leaks
+  cleanup() {
+    // Remove all MIDI input event listeners
+    this.inputs.forEach(input => {
+      input.removeEventListener('midimessage', this.boundHandleMIDIMessage)
+    })
+    console.log('MIDI event listeners cleaned up')
   }
 }
 
