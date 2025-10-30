@@ -34,18 +34,18 @@ export default class Editor extends EventEmitter {
 
     // }
     Object.entries(keymaps).forEach(([key, e]) => extraKeys[key] = () => {
-      if(e == 'editor: eval block') {
+      if (e == 'editor: eval block') {
         this.emit('repl: eval', this.getCurrentBlock().text)
       } else if (e == 'editor: eval line') {
         this.emit('repl: eval', this.getLine())
-      // } else if (e == 'editor: eval all') {
-      //   const code = this.cm.getValue()
-      //   this.flashCode()
-      //   this.emit('repl: eval', code)
-      //   this.emit('gallery: save to URL', code)
+        // } else if (e == 'editor: eval all') {
+        //   const code = this.cm.getValue()
+        //   this.flashCode()
+        //   this.emit('repl: eval', code)
+        //   this.emit('gallery: save to URL', code)
       } else if (e == 'editor:toggleComment') {
         this.cm.toggleComment()
-      // } else if (e == 'gallery:saveToURL') {
+        // } else if (e == 'gallery:saveToURL') {
         this.emit(e, this)
       } else if (e === 'editor:formatCode') {
         this.formatCode()
@@ -64,7 +64,10 @@ export default class Editor extends EventEmitter {
       mode: { name: 'javascript', globalVars: true },
       lineWrapping: true,
       styleSelectedText: true,
-      extraKeys: extraKeys
+      extraKeys: extraKeys,
+      indentWithTabs: false,
+      indentUnit: 2,
+      tabSize: 2
     }
 
     this.cm = CodeMirror.fromTextArea(parent, opts)
@@ -94,7 +97,18 @@ export default class Editor extends EventEmitter {
   }
 
   formatCode() {
-    const formatted = beautify(this.cm.getValue(), { indent_size: 2, "break_chained_methods": true, "indent_with_tabs": true})
+    const formatted = beautify(this.cm.getValue(), {
+      indent_size: 0,
+      indent_with_tabs: false,
+      break_chained_methods: true,      // メソッドチェーンで改行
+      max_preserve_newlines: 2,         // 最大2行の空行を保持
+      preserve_newlines: true,          // 既存の改行を保持
+      brace_style: "collapse",          // { を同じ行に
+      operator_position: "after-newline",  // ドットを行頭に
+      space_in_paren: false,            // 括弧内にスペースを入れない
+      jslint_happy: false,
+      keep_array_indentation: false
+    })
     this.cm.setValue(formatted)
   }
 
