@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "vite build",
-    "dev": "vite . --host",
+    "dev": "vite . --host ",
     "publish": "git subtree push --prefix=dist origin gh-pages"
   },
   "author": "",
@@ -41,6 +41,7 @@
     "source-map-explorer": "^2.5.2",
     "terser": "^5.14.2",
     "vite": "^4.4.4",
+    "vite-plugin-html": "^3.2.2",
     "watchify": "^4.0.0"
   }
 }

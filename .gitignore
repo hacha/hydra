@@ -1,6 +1,20 @@
 .DS_Store
 node_modules
+dist/
 .env
 .data
 *~
 backend/certs
+
+# Serena MCP server files
+.serena/
+
+# MCP configuration (personal environment)
+.mcp.json
+
+# Log files
+*.log
+nohup.out
+
+# Personal notes
+memo.txt
