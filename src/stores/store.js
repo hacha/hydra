@@ -391,6 +391,7 @@ export default function store(state, emitter) {
   // Keyboard event handlers for Ctrl-V output preview
   let isCtrlPressed = false
   let isVPressed = false
+  let isAPressed = false
 
   function updatePreviewState() {
     const shouldShow = isCtrlPressed && isVPressed
@@ -400,15 +401,35 @@ export default function store(state, emitter) {
     }
   }
 
+  function updateAudioVisualizerState() {
+    const shouldShow = isCtrlPressed && isAPressed
+    const audioObj = window.a || (window.hydraSynth && window.hydraSynth.synth && window.hydraSynth.synth.a)
+    if (typeof window !== 'undefined' && audioObj) {
+      if (shouldShow) {
+        audioObj.show()
+      } else {
+        audioObj.hide()
+      }
+    }
+  }
+
   // Set up global keyboard event listeners
   if (typeof window !== 'undefined') {
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Control') {
         isCtrlPressed = true
         updatePreviewState()
+        updateAudioVisualizerState()
       } else if (event.key === 'v' || event.key === 'V') {
         isVPressed = true
         updatePreviewState()
+      } else if (event.key === 'a' || event.key === 'A') {
+        isAPressed = true
+        updateAudioVisualizerState()
+        // Prevent default "select all" behavior when Ctrl+A is pressed
+        if (isCtrlPressed) {
+          event.preventDefault()
+        }
       }
     })
 
@@ -416,9 +437,13 @@ export default function store(state, emitter) {
       if (event.key === 'Control') {
         isCtrlPressed = false
         updatePreviewState()
+        updateAudioVisualizerState()
       } else if (event.key === 'v' || event.key === 'V') {
         isVPressed = false
         updatePreviewState()
+      } else if (event.key === 'a' || event.key === 'A') {
+        isAPressed = false
+        updateAudioVisualizerState()
       }
     })
   }
