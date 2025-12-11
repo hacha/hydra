@@ -258,6 +258,41 @@ class TapTempo {
   }
 }
 
+// Audio object extension for independent temp show state
+function extendAudioObject(audioObj) {
+  if (audioObj._isExtended) return // prevent double extension
+  audioObj._isExtended = true
+  audioObj._isShownByUser = audioObj.isDrawing || false
+  audioObj._isTempShown = false
+
+  const originalShow = audioObj.show.bind(audioObj)
+  const originalHide = audioObj.hide.bind(audioObj)
+
+  audioObj.show = function() {
+    this._isShownByUser = true
+    originalShow()
+  }
+
+  audioObj.hide = function() {
+    this._isShownByUser = false
+    if (!this._isTempShown) {
+      originalHide()
+    }
+  }
+
+  audioObj.tempShow = function() {
+    this._isTempShown = true
+    originalShow()
+  }
+
+  audioObj.tempHide = function() {
+    this._isTempShown = false
+    if (!this._isShownByUser) {
+      originalHide()
+    }
+  }
+}
+
 export default function store(state, emitter) {
   state.showInfo = false
   state.showUI = true
@@ -402,13 +437,14 @@ export default function store(state, emitter) {
   }
 
   function updateAudioVisualizerState() {
-    const shouldShow = isCtrlPressed && isAPressed
+    const shouldTempShow = isCtrlPressed && isAPressed
     const audioObj = window.a || (window.hydraSynth && window.hydraSynth.synth && window.hydraSynth.synth.a)
     if (typeof window !== 'undefined' && audioObj) {
-      if (shouldShow) {
-        audioObj.show()
+      extendAudioObject(audioObj)
+      if (shouldTempShow) {
+        audioObj.tempShow()
       } else {
-        audioObj.hide()
+        audioObj.tempHide()
       }
     }
   }
