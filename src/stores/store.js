@@ -326,6 +326,9 @@ export default function store(state, emitter) {
   })
 
   emitter.on('repl: eval', (code = '', callback) => {
+    // パフォーマンス記録用スナップショット
+    emitter.emit('performance: snapshot', code)
+
     repl.eval(code, (info) => {
       state.errorMessage = info.errorMessage
       state.isError = info.isError
