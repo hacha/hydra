@@ -88,7 +88,10 @@ export default function performanceStore(state, emitter) {
     playbackSpeed: 1.0,
 
     // セッション一覧
-    sessions: {}
+    sessions: {},
+
+    // セッションリストUI
+    showSessionList: false
   }
 
   // 初期化時にメタデータを読み込み
@@ -108,6 +111,11 @@ export default function performanceStore(state, emitter) {
       const start = parseInt(params.get('start') || '0', 10)
       const speed = parseFloat(params.get('speed') || '1')
       emitter.emit('performance: start playback', sessionId, start, speed)
+    }
+
+    // /sessions/ パスでセッション一覧を表示
+    if (window.location.pathname.endsWith('/sessions') || window.location.pathname.endsWith('/sessions/')) {
+      emitter.emit('performance: show session list')
     }
   })
 
@@ -295,6 +303,82 @@ export default function performanceStore(state, emitter) {
   emitter.on('performance: list sessions', () => {
     const meta = storage.getMeta()
     state.performance.sessions = meta.sessions
+    emitter.emit('render')
+  })
+
+  // セッションリスト表示
+  emitter.on('performance: show session list', () => {
+    const meta = storage.getMeta()
+    state.performance.sessions = meta.sessions
+    state.performance.showSessionList = true
+    emitter.emit('render')
+  })
+
+  // セッションリスト非表示
+  emitter.on('performance: hide session list', () => {
+    state.performance.showSessionList = false
+    emitter.emit('render')
+  })
+
+  // セッションリストトグル
+  emitter.on('performance: toggle session list', () => {
+    if (state.performance.showSessionList) {
+      emitter.emit('performance: hide session list')
+    } else {
+      emitter.emit('performance: show session list')
+    }
+  })
+
+  // セッションエクスポート
+  emitter.on('performance: export session', (sessionId) => {
+    const session = storage.getSession(sessionId)
+    if (!session) {
+      console.warn(`[Performance] Session not found: ${sessionId}`)
+      return
+    }
+
+    const data = JSON.stringify(session, null, 2)
+    const blob = new Blob([data], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `hydra-session-${session.name.replace(/[^a-zA-Z0-9]/g, '-')}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+
+    console.log(`[Performance] Session exported: ${sessionId}`)
+  })
+
+  // セッションインポート
+  emitter.on('performance: import session', (sessionData) => {
+    if (!sessionData || !sessionData.id || !sessionData.snapshots) {
+      console.warn('[Performance] Invalid session data')
+      return
+    }
+
+    // 新しいIDを割り当て（既存セッションとの衝突を避ける）
+    const newId = generateUUID()
+    const importedSession = {
+      ...sessionData,
+      id: newId,
+      name: sessionData.name + ' (imported)'
+    }
+
+    storage.saveSession(importedSession)
+
+    // メタデータを更新
+    const meta = storage.getMeta()
+    meta.sessions[newId] = {
+      id: newId,
+      name: importedSession.name,
+      createdAt: importedSession.createdAt,
+      snapshotCount: importedSession.snapshots.length,
+      duration: importedSession.duration || 0
+    }
+    storage.saveMeta(meta)
+
+    state.performance.sessions = meta.sessions
+    console.log(`[Performance] Session imported: ${newId}`)
     emitter.emit('render')
   })
 }

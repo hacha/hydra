@@ -7,7 +7,8 @@ const keymap = {
     'Shift-Ctrl-h': 'ui: hide all',
     // Performance recording
     'Shift-Ctrl-r': 'performance: toggle recording',
-    'Shift-Ctrl-p': 'performance: toggle playback'
+    'Shift-Ctrl-p': 'performance: toggle playback',
+    'Shift-Ctrl-m': 'performance: toggle session list'
 }
 
 export default (emit) => {

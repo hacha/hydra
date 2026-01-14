@@ -27,9 +27,13 @@ if (isProduction) {
   app.route('/hydra', mainView)
   app.route('/hydra/', mainView)
   app.route('/hydra/dev', mainView)
+  app.route('/hydra/sessions', mainView)
+  app.route('/hydra/sessions/', mainView)
 } else {
   app.route('/', mainView)
   app.route('/dev', mainView)
+  app.route('/sessions', mainView)
+  app.route('/sessions/', mainView)
 }
 
 app.mount('body')

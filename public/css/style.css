@@ -172,3 +172,158 @@ a:hover {
   border-top: 5px solid transparent;
   border-bottom: 5px solid transparent;
 }
+
+/* Session List */
+#session-list-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#session-list-modal {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  font-family: monospace;
+}
+
+.session-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #333;
+}
+
+.session-list-header h3 {
+  margin: 0;
+  font-size: 14px;
+  color: #fff;
+}
+
+.session-list-header .close-btn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.session-list-header .close-btn:hover {
+  color: #fff;
+}
+
+.session-list-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.no-sessions {
+  color: #666;
+  text-align: center;
+  padding: 24px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.session-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.session-item:hover {
+  background: #2a2a2a;
+}
+
+.session-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-name {
+  color: #fff;
+  font-size: 12px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-meta {
+  color: #666;
+  font-size: 10px;
+}
+
+.session-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.session-actions button {
+  background: #333;
+  border: none;
+  color: #888;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.session-actions button:hover {
+  background: #444;
+  color: #fff;
+}
+
+.session-actions .delete-btn:hover {
+  background: #633;
+  color: #f88;
+}
+
+.session-list-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #333;
+}
+
+.import-label {
+  display: inline-block;
+  padding: 6px 12px;
+  background: #333;
+  border-radius: 4px;
+  color: #aaa;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.import-label:hover {
+  background: #444;
+  color: #fff;
+}
+
+.import-label input[type="file"] {
+  display: none;
+}
