@@ -6,16 +6,20 @@ const keymap = {
     'Shift-Ctrl-f': 'editor: format code',
     'Shift-Ctrl-h': 'ui: hide all',
     // Performance recording
-    'Shift-Ctrl-r': 'performance: toggle recording',
-    'Shift-Ctrl-p': 'performance: toggle playback',
+    'Shift-Ctrl-p': 'performance: toggle recording',
     'Shift-Ctrl-m': 'performance: toggle session list'
 }
 
 export default (emit) => {
+    console.log('[hydra-keymaps] Registering keymaps:', Object.keys(keymap))
     const keymapsArray = Object.entries(keymap).map(([key, val]) => {
         return {
         key: key,
-        run: () => { emit(val) }
+        run: () => {
+          console.log(`[hydra-keymaps] Key pressed: ${key} -> ${val}`)
+          emit(val)
+          return true
+        }
       }})
     return keymapsArray
 }

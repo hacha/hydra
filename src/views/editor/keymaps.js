@@ -6,5 +6,8 @@ export default {
     'Shift-Ctrl-Enter': 'editor: eval all',
     'Shift-Ctrl-F': 'editor: format code',
     'Shift-Ctrl-H': 'ui: hide all',
-    'Shift-Ctrl-T': 'tap-tempo:toggle'
+    'Shift-Ctrl-T': 'tap-tempo:toggle',
+    // Performance recording
+    'Shift-Ctrl-P': 'performance: toggle recording',
+    'Shift-Ctrl-M': 'performance: toggle session list'
 }

@@ -16,6 +16,10 @@ export default class Editor extends EventEmitter {
     console.log("*** Editor class created");
     var self = this
 
+    console.log('[Editor] About to create EditorView with keymaps')
+    const keymaps = hydraKeymaps(emit)
+    console.log('[Editor] Keymaps created:', keymaps)
+
     this.cm = new EditorView({
       lineWrapping: true,
       extensions: [
@@ -27,7 +31,7 @@ export default class Editor extends EventEmitter {
           if (shouldUpdateURL) emit('gallery: save to URL', code)
         }),
         flashTheme,
-        keymap.of(hydraKeymaps(emit))
+        keymap.of(keymaps)
       ],
       parent: parent,
 

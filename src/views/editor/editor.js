@@ -33,7 +33,9 @@ export default class Editor extends EventEmitter {
     // const evalCode = (code) => {
 
     // }
+    console.log('[Editor] Registering keymaps:', Object.keys(keymaps))
     Object.entries(keymaps).forEach(([key, e]) => extraKeys[key] = () => {
+      console.log(`[Editor] Key pressed: ${key} -> ${e}`)
       if (e == 'editor: eval block') {
         this.emit('repl: eval', this.getCurrentBlock().text)
       } else if (e == 'editor: eval line') {
@@ -52,6 +54,8 @@ export default class Editor extends EventEmitter {
       } else if (e == 'gallery:saveToURL') {
         this.emit('editor: save to URL', this.cm.getValue())
       } else if (e == 'tap-tempo:tap' || e == 'tap-tempo:toggle') {
+        this.emit(e)
+      } else if (e.startsWith('performance:')) {
         this.emit(e)
       } else {
         this.emit(e, this)
