@@ -268,9 +268,23 @@ export default function performanceStore(state, emitter) {
       }
       startIndex = i + 1
     }
-    state.performance.playbackIndex = startIndex
 
-    console.log(`[Performance] Playback started: ${sessionId}, from index ${startIndex}`)
+    // 開始時に直前のスナップショット（またはsnapshot[0]）を即座に適用
+    const initialIndex = startIndex > 0 ? startIndex - 1 : 0
+    const initialSnapshot = session.snapshots[initialIndex]
+    emitter.emit('editor: load code', initialSnapshot.code)
+    emitter.emit('repl: eval', initialSnapshot.code)
+
+    // playbackIndexは次に再生するスナップショットを指す
+    state.performance.playbackIndex = initialIndex + 1
+
+    // timestamp情報を初期化
+    const prevSnapshot = initialIndex > 0 ? session.snapshots[initialIndex - 1] : null
+    const nextSnapshot = session.snapshots[initialIndex + 1]
+    state.performance.currentSnapshotTime = prevSnapshot ? prevSnapshot.timestamp : 0
+    state.performance.nextSnapshotTime = nextSnapshot ? nextSnapshot.timestamp : initialSnapshot.timestamp
+
+    console.log(`[Performance] Playback started: ${sessionId}, applied snapshot ${initialIndex}`)
     emitter.emit('render')
 
     // 再生を開始
@@ -395,6 +409,89 @@ export default function performanceStore(state, emitter) {
         console.warn('[Performance] No session to play')
       }
     }
+  })
+
+  // 前のスナップショットへ
+  // playbackIndex は「次に再生するインデックス」なので、
+  // 現在表示中は playbackIndex - 1、その1つ前は playbackIndex - 2
+  emitter.on('performance: prev snapshot', () => {
+    if (!state.performance.isPlaying && !state.performance.isPaused) return
+
+    const sessionId = state.performance.playbackSessionId
+    const session = storage.getSession(sessionId)
+    if (!session) return
+
+    // 1つ前のスナップショットのインデックス
+    const targetIndex = state.performance.playbackIndex - 2
+    if (targetIndex < 0) return
+
+    const snapshot = session.snapshots[targetIndex]
+
+    // コードを適用
+    emitter.emit('editor: load code', snapshot.code)
+    emitter.emit('repl: eval', snapshot.code)
+
+    // playbackIndex を更新（次に再生するのは targetIndex + 1）
+    state.performance.playbackIndex = targetIndex + 1
+    state.performance.playbackProgress = 0
+
+    // timestamp情報を更新
+    const prevSnapshot = targetIndex > 0 ? session.snapshots[targetIndex - 1] : null
+    const nextSnapshot = session.snapshots[targetIndex + 1]
+    state.performance.currentSnapshotTime = prevSnapshot ? prevSnapshot.timestamp : 0
+    state.performance.nextSnapshotTime = nextSnapshot ? nextSnapshot.timestamp : snapshot.timestamp
+
+    // 再生中の場合、playbackStartTimeを調整して次のスナップショットをスケジュール
+    if (state.performance.isPlaying) {
+      state.performance.playbackStartTime = Date.now() - snapshot.timestamp / state.performance.playbackSpeed
+      if (state.performance.playbackTimerId) {
+        clearTimeout(state.performance.playbackTimerId)
+      }
+      scheduleNextSnapshot(session, emitter, state)
+    }
+
+    console.log(`[Performance] Jumped to snapshot ${targetIndex}`)
+    emitter.emit('render')
+  })
+
+  // 次のスナップショットへ
+  // playbackIndex が指すスナップショットを適用する
+  emitter.on('performance: next snapshot', () => {
+    if (!state.performance.isPlaying && !state.performance.isPaused) return
+
+    const sessionId = state.performance.playbackSessionId
+    const session = storage.getSession(sessionId)
+    if (!session) return
+
+    const targetIndex = state.performance.playbackIndex
+    if (targetIndex >= session.snapshots.length) return
+
+    const snapshot = session.snapshots[targetIndex]
+
+    // コードを適用
+    emitter.emit('editor: load code', snapshot.code)
+    emitter.emit('repl: eval', snapshot.code)
+
+    // playbackIndex を更新
+    state.performance.playbackIndex = targetIndex + 1
+    state.performance.playbackProgress = 0
+
+    // timestamp情報を更新
+    const nextSnapshot = session.snapshots[targetIndex + 1]
+    state.performance.currentSnapshotTime = snapshot.timestamp
+    state.performance.nextSnapshotTime = nextSnapshot ? nextSnapshot.timestamp : snapshot.timestamp
+
+    // 再生中の場合、playbackStartTimeを調整して次のスナップショットをスケジュール
+    if (state.performance.isPlaying) {
+      state.performance.playbackStartTime = Date.now() - snapshot.timestamp / state.performance.playbackSpeed
+      if (state.performance.playbackTimerId) {
+        clearTimeout(state.performance.playbackTimerId)
+      }
+      scheduleNextSnapshot(session, emitter, state)
+    }
+
+    console.log(`[Performance] Jumped to snapshot ${targetIndex}`)
+    emitter.emit('render')
   })
 
   // セッション削除

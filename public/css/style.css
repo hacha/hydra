@@ -181,20 +181,29 @@ a:hover {
   background: #fff;
 }
 
-#recording-indicator.clickable {
+#recording-indicator.playback {
+  gap: 2px;
+}
+
+#recording-indicator .ctrl-btn,
+#recording-indicator .ctrl-main {
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
   pointer-events: auto;
   cursor: pointer;
 }
 
-#recording-indicator.clickable:hover {
+#recording-indicator .ctrl-btn:hover,
+#recording-indicator .ctrl-main:hover {
   opacity: 1;
 }
 
-#recording-indicator.playing,
-#recording-indicator.paused {
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.1);
+#recording-indicator .ctrl-main {
+  position: relative;
+  gap: 5px;
   overflow: hidden;
 }
 
@@ -205,7 +214,22 @@ a:hover {
   height: 100%;
   width: 0;
   background: rgba(255, 255, 255, 0.25);
-  transition: none;
+}
+
+#recording-indicator .prev-icon,
+#recording-indicator .next-icon {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+
+#recording-indicator .prev-icon {
+  border-right: 5px solid #fff;
+}
+
+#recording-indicator .next-icon {
+  border-left: 5px solid #fff;
 }
 
 /* Session List */
