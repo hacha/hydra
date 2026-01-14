@@ -253,6 +253,7 @@ export default function performanceStore(state, emitter) {
     state.performance.playbackSessionId = sessionId
     state.performance.playbackSpeed = speed
     state.performance.playbackStartTime = Date.now() - startOffset
+    state.performance.playbackTotal = session.snapshots.length
 
     // startOffsetに基づいて開始インデックスを決定
     let startIndex = 0

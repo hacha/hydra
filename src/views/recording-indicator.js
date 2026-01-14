@@ -9,7 +9,7 @@ export default function recordingIndicator(state, emit) {
     return html`
       <div id="recording-indicator" class="recording">
         <span class="rec-dot"></span>
-        REC ${perf.snapshotCount}
+        <span class="count">${perf.snapshotCount}</span>
       </div>
     `
   }
@@ -18,7 +18,7 @@ export default function recordingIndicator(state, emit) {
     return html`
       <div id="recording-indicator" class="playing">
         <span class="play-icon"></span>
-        PLAY
+        <span class="count">${perf.playbackIndex}/${perf.playbackTotal || '?'}</span>
       </div>
     `
   }

@@ -130,32 +130,23 @@ a:hover {
 /* Recording Indicator */
 #recording-indicator {
   position: fixed;
-  top: 10px;
+  bottom: 10px;
   right: 10px;
   z-index: 100;
-  color: rgba(255, 255, 255, .9);
-  padding: 4px 8px;
-  font-family: monospace;
-  font-size: 11px;
   pointer-events: none;
-  border-radius: 3px;
+  opacity: 0.6;
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-
-#recording-indicator.recording {
-  background: rgba(200, 0, 0, 0.7);
-}
-
-#recording-indicator.playing {
-  background: rgba(0, 150, 0, 0.7);
+  gap: 5px;
+  font-family: monospace;
+  font-size: 10px;
+  color: #fff;
 }
 
 #recording-indicator .rec-dot {
-  width: 8px;
-  height: 8px;
-  background: #ff3333;
+  width: 6px;
+  height: 6px;
+  background: #fff;
   border-radius: 50%;
   animation: rec-blink 1s ease-in-out infinite;
 }
@@ -168,9 +159,13 @@ a:hover {
 #recording-indicator .play-icon {
   width: 0;
   height: 0;
-  border-left: 8px solid #fff;
-  border-top: 5px solid transparent;
-  border-bottom: 5px solid transparent;
+  border-left: 6px solid #fff;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+
+#recording-indicator .count {
+  color: #fff;
 }
 
 /* Session List */
