@@ -27,8 +27,9 @@ export default function sessionList(state, emit) {
   }
 
   const playSession = (sessionId) => {
-    emit('performance: hide session list')
-    emit('performance: start playback', sessionId)
+    const url = new URL(window.location.href)
+    url.search = `?playback=${sessionId}&start=0&speed=1`
+    window.location.href = url.toString()
   }
 
   const deleteSession = (sessionId, e) => {
@@ -62,6 +63,7 @@ export default function sessionList(state, emit) {
                     ${session.snapshotCount || 0} snapshots ·
                     ${formatDuration(session.duration)}
                   </div>
+                  <div class="session-id" onclick=${e => e.stopPropagation()}>${session.id}</div>
                 </div>
                 <div class="session-actions">
                   <button class="export-btn" onclick=${(e) => exportSession(session.id, e)} title="Export">↓</button>

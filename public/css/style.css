@@ -333,6 +333,15 @@ a:hover {
   font-size: 10px;
 }
 
+.session-id {
+  color: #555;
+  font-size: 9px;
+  font-family: monospace;
+  opacity: 0.7;
+  user-select: all;
+  cursor: text;
+}
+
 .session-actions {
   display: flex;
   gap: 4px;
