@@ -166,13 +166,27 @@ export default function performanceStore(state, emitter) {
     const session = storage.getSession(sessionId)
 
     if (session) {
-      // メタデータを更新
-      const meta = storage.getMeta()
-      if (meta.sessions[sessionId]) {
-        meta.sessions[sessionId].snapshotCount = session.snapshots.length
-        meta.sessions[sessionId].duration = Date.now() - state.performance.recordingStartTime
+      if (session.snapshots.length === 0) {
+        // スナップショットが0件なら削除
+        storage.deleteSession(sessionId)
+        const meta = storage.getMeta()
+        delete meta.sessions[sessionId]
+        if (meta.lastSessionId === sessionId) {
+          meta.lastSessionId = null
+        }
         storage.saveMeta(meta)
         state.performance.sessions = meta.sessions
+        console.log(`[Performance] Recording cancelled (no snapshots): ${sessionId}`)
+      } else {
+        // メタデータを更新
+        const meta = storage.getMeta()
+        if (meta.sessions[sessionId]) {
+          meta.sessions[sessionId].snapshotCount = session.snapshots.length
+          meta.sessions[sessionId].duration = Date.now() - state.performance.recordingStartTime
+          storage.saveMeta(meta)
+          state.performance.sessions = meta.sessions
+        }
+        console.log(`[Performance] Recording stopped: ${sessionId}`)
       }
     }
 
@@ -180,7 +194,6 @@ export default function performanceStore(state, emitter) {
     state.performance.currentSessionId = null
     state.performance.recordingStartTime = null
 
-    console.log(`[Performance] Recording stopped: ${sessionId}`)
     emitter.emit('render')
   })
 
