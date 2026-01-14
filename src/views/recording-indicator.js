@@ -16,8 +16,10 @@ export default function recordingIndicator(state, emit) {
 
   if (perf.isPlaying) {
     const togglePause = () => emit('performance: pause playback')
+    const progress = perf.playbackProgress || 0
     return html`
       <div id="recording-indicator" class="playing clickable" onclick=${togglePause}>
+        <div class="progress-bg" style="width: ${progress}%"></div>
         <span class="pause-icon"></span>
         <span class="count">${perf.playbackIndex}/${perf.playbackTotal || '?'}</span>
       </div>

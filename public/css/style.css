@@ -190,6 +190,23 @@ a:hover {
   opacity: 1;
 }
 
+#recording-indicator.playing {
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+#recording-indicator .progress-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0;
+  background: rgba(255, 255, 255, 0.25);
+  transition: none;
+}
+
 /* Session List */
 #session-list-overlay {
   position: fixed;

@@ -86,6 +86,10 @@ export default function performanceStore(state, emitter) {
     playbackIndex: 0,
     playbackTimerId: null,
     playbackSpeed: 1.0,
+    playbackProgress: 0,
+    progressIntervalId: null,
+    currentSnapshotTime: 0,
+    nextSnapshotTime: 0,
 
     // セッション一覧
     sessions: {},
@@ -271,6 +275,25 @@ export default function performanceStore(state, emitter) {
 
     // 再生を開始
     scheduleNextSnapshot(session, emitter, state)
+
+    // 進捗更新インターバルを開始
+    state.performance.progressIntervalId = setInterval(() => {
+      if (!state.performance.isPlaying) return
+
+      const elapsed = (Date.now() - state.performance.playbackStartTime) * state.performance.playbackSpeed
+      const currentTime = state.performance.currentSnapshotTime || 0
+      const nextTime = state.performance.nextSnapshotTime || 0
+      const interval = nextTime - currentTime
+
+      let progress = 0
+      if (interval > 0) {
+        const timeIntoInterval = elapsed - currentTime
+        progress = Math.min(100, Math.max(0, (timeIntoInterval / interval) * 100))
+      }
+
+      state.performance.playbackProgress = progress
+      emitter.emit('render')
+    }, 50)
   })
 
   // 再生停止
@@ -282,10 +305,16 @@ export default function performanceStore(state, emitter) {
       state.performance.playbackTimerId = null
     }
 
+    if (state.performance.progressIntervalId) {
+      clearInterval(state.performance.progressIntervalId)
+      state.performance.progressIntervalId = null
+    }
+
     state.performance.isPlaying = false
     state.performance.isPaused = false
     state.performance.playbackSessionId = null
     state.performance.playbackIndex = 0
+    state.performance.playbackProgress = 0
 
     console.log('[Performance] Playback stopped')
     emitter.emit('render')
@@ -298,6 +327,11 @@ export default function performanceStore(state, emitter) {
     if (state.performance.playbackTimerId) {
       clearTimeout(state.performance.playbackTimerId)
       state.performance.playbackTimerId = null
+    }
+
+    if (state.performance.progressIntervalId) {
+      clearInterval(state.performance.progressIntervalId)
+      state.performance.progressIntervalId = null
     }
 
     state.performance.isPlaying = false
@@ -327,6 +361,25 @@ export default function performanceStore(state, emitter) {
     emitter.emit('render')
 
     scheduleNextSnapshot(session, emitter, state)
+
+    // 進捗更新インターバルを再開
+    state.performance.progressIntervalId = setInterval(() => {
+      if (!state.performance.isPlaying) return
+
+      const elapsed = (Date.now() - state.performance.playbackStartTime) * state.performance.playbackSpeed
+      const currentTime = state.performance.currentSnapshotTime || 0
+      const nextTime = state.performance.nextSnapshotTime || 0
+      const interval = nextTime - currentTime
+
+      let progress = 0
+      if (interval > 0) {
+        const timeIntoInterval = elapsed - currentTime
+        progress = Math.min(100, Math.max(0, (timeIntoInterval / interval) * 100))
+      }
+
+      state.performance.playbackProgress = progress
+      emitter.emit('render')
+    }, 50)
   })
 
   // 再生トグル
@@ -458,6 +511,12 @@ function scheduleNextSnapshot(session, emitter, state) {
   }
 
   const snapshot = session.snapshots[index]
+  const prevSnapshot = index > 0 ? session.snapshots[index - 1] : null
+  
+  // 進捗計算用のtimestamp情報を保存
+  state.performance.currentSnapshotTime = prevSnapshot ? prevSnapshot.timestamp : 0
+  state.performance.nextSnapshotTime = snapshot.timestamp
+  
   const elapsed = Date.now() - state.performance.playbackStartTime
   const targetTime = snapshot.timestamp / state.performance.playbackSpeed
   const delay = Math.max(0, targetTime - elapsed)
