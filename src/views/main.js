@@ -4,6 +4,7 @@ import Hydra from './Hydra.js'
 import Editor from './EditorComponent.js'
 import bpmDisplay from './bpm-display.js'
 import outputPreview from './output-preview.js'
+import recordingIndicator from './recording-indicator.js'
 // import Editor from './EditorCm6.js'
 
 
@@ -19,6 +20,7 @@ export default function mainView(state, emit) {
   ${state.cache(Editor, 'editor').render(state, emit)}
   ${bpmDisplay(state, emit)}
   ${outputPreview(state, emit)}
+  ${recordingIndicator(state, emit)}
   </body>
  `
 }
