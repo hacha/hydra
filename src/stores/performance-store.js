@@ -242,7 +242,8 @@ export default function performanceStore(state, emitter) {
   })
 
   // 再生開始
-  emitter.on('performance: start playback', (sessionId, startOffset = 0, speed = 1.0) => {
+  // startIndex: 開始するスナップショットのインデックス（0から始まる）
+  emitter.on('performance: start playback', (sessionId, startIndex = 0, speed = 1.0) => {
     if (state.performance.isPlaying) {
       emitter.emit('performance: stop playback')
     }
@@ -253,25 +254,15 @@ export default function performanceStore(state, emitter) {
       return
     }
 
+    // startIndexを有効範囲内に収める
+    const initialIndex = Math.max(0, Math.min(startIndex, session.snapshots.length - 1))
+    const initialSnapshot = session.snapshots[initialIndex]
+
     state.performance.isPlaying = true
     state.performance.playbackSessionId = sessionId
     state.performance.playbackSpeed = speed
-    state.performance.playbackStartTime = Date.now() - startOffset
+    state.performance.playbackStartTime = Date.now() - initialSnapshot.timestamp / speed
     state.performance.playbackTotal = session.snapshots.length
-
-    // startOffsetに基づいて開始インデックスを決定
-    let startIndex = 0
-    for (let i = 0; i < session.snapshots.length; i++) {
-      if (session.snapshots[i].timestamp >= startOffset) {
-        startIndex = i
-        break
-      }
-      startIndex = i + 1
-    }
-
-    // 開始時に直前のスナップショット（またはsnapshot[0]）を即座に適用
-    const initialIndex = startIndex > 0 ? startIndex - 1 : 0
-    const initialSnapshot = session.snapshots[initialIndex]
     emitter.emit('editor: load code', initialSnapshot.code)
     emitter.emit('repl: eval', initialSnapshot.code)
 

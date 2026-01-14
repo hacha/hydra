@@ -82,7 +82,7 @@
 **URLパラメータ**
 - `?record=true` - ページ読み込み時に自動で記録開始
 - `?playback=<sessionId>` - 指定セッションを自動再生
-- `?playback=<sessionId>&start=<ms>&speed=<倍率>` - 開始位置と再生速度を指定
+- `?playback=<sessionId>&start=<index>&speed=<倍率>` - 開始スナップショット番号（0始まり）と再生速度を指定
 
 #### 解像度設定
 - デフォルト解像度を1920x1080に変更
