@@ -213,6 +213,14 @@ export default function performanceStore(state, emitter) {
     storage.saveSession(session)
     state.performance.snapshotCount = session.snapshots.length
 
+    // メタデータもリアルタイム更新
+    const meta = storage.getMeta()
+    if (meta.sessions[sessionId]) {
+      meta.sessions[sessionId].snapshotCount = session.snapshots.length
+      meta.sessions[sessionId].duration = Date.now() - state.performance.recordingStartTime
+      storage.saveMeta(meta)
+    }
+
     console.log(`[Performance] Snapshot added: ${timestamp}ms, total: ${session.snapshots.length}`)
   })
 
