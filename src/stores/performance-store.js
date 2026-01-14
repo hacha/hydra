@@ -275,6 +275,24 @@ export default function performanceStore(state, emitter) {
 
   // 再生停止
   emitter.on('performance: stop playback', () => {
+    if (!state.performance.isPlaying && !state.performance.isPaused) return
+
+    if (state.performance.playbackTimerId) {
+      clearTimeout(state.performance.playbackTimerId)
+      state.performance.playbackTimerId = null
+    }
+
+    state.performance.isPlaying = false
+    state.performance.isPaused = false
+    state.performance.playbackSessionId = null
+    state.performance.playbackIndex = 0
+
+    console.log('[Performance] Playback stopped')
+    emitter.emit('render')
+  })
+
+  // 一時停止
+  emitter.on('performance: pause playback', () => {
     if (!state.performance.isPlaying) return
 
     if (state.performance.playbackTimerId) {
@@ -283,11 +301,32 @@ export default function performanceStore(state, emitter) {
     }
 
     state.performance.isPlaying = false
-    state.performance.playbackSessionId = null
-    state.performance.playbackIndex = 0
+    state.performance.isPaused = true
+    state.performance.pausedAt = Date.now()
 
-    console.log('[Performance] Playback stopped')
+    console.log('[Performance] Playback paused')
     emitter.emit('render')
+  })
+
+  // 再開
+  emitter.on('performance: resume playback', () => {
+    if (!state.performance.isPaused) return
+
+    const sessionId = state.performance.playbackSessionId
+    const session = storage.getSession(sessionId)
+    if (!session) return
+
+    // 一時停止していた時間分だけ開始時刻を調整
+    const pauseDuration = Date.now() - state.performance.pausedAt
+    state.performance.playbackStartTime += pauseDuration
+
+    state.performance.isPlaying = true
+    state.performance.isPaused = false
+
+    console.log('[Performance] Playback resumed')
+    emitter.emit('render')
+
+    scheduleNextSnapshot(session, emitter, state)
   })
 
   // 再生トグル

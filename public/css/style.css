@@ -168,6 +168,28 @@ a:hover {
   color: #fff;
 }
 
+#recording-indicator .pause-icon {
+  display: flex;
+  gap: 2px;
+}
+
+#recording-indicator .pause-icon::before,
+#recording-indicator .pause-icon::after {
+  content: '';
+  width: 2px;
+  height: 8px;
+  background: #fff;
+}
+
+#recording-indicator.clickable {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+#recording-indicator.clickable:hover {
+  opacity: 1;
+}
+
 /* Session List */
 #session-list-overlay {
   position: fixed;
