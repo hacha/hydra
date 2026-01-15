@@ -130,32 +130,23 @@ a:hover {
 /* Recording Indicator */
 #recording-indicator {
   position: fixed;
-  top: 10px;
+  bottom: 10px;
   right: 10px;
   z-index: 100;
-  color: rgba(255, 255, 255, .9);
-  padding: 4px 8px;
-  font-family: monospace;
-  font-size: 11px;
   pointer-events: none;
-  border-radius: 3px;
+  opacity: 0.6;
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-
-#recording-indicator.recording {
-  background: rgba(200, 0, 0, 0.7);
-}
-
-#recording-indicator.playing {
-  background: rgba(0, 150, 0, 0.7);
+  gap: 5px;
+  font-family: monospace;
+  font-size: 10px;
+  color: #fff;
 }
 
 #recording-indicator .rec-dot {
-  width: 8px;
-  height: 8px;
-  background: #ff3333;
+  width: 6px;
+  height: 6px;
+  background: #fff;
   border-radius: 50%;
   animation: rec-blink 1s ease-in-out infinite;
 }
@@ -168,9 +159,77 @@ a:hover {
 #recording-indicator .play-icon {
   width: 0;
   height: 0;
-  border-left: 8px solid #fff;
-  border-top: 5px solid transparent;
-  border-bottom: 5px solid transparent;
+  border-left: 6px solid #fff;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+
+#recording-indicator .count {
+  color: #fff;
+}
+
+#recording-indicator .pause-icon {
+  display: flex;
+  gap: 2px;
+}
+
+#recording-indicator .pause-icon::before,
+#recording-indicator .pause-icon::after {
+  content: '';
+  width: 2px;
+  height: 8px;
+  background: #fff;
+}
+
+#recording-indicator.playback {
+  gap: 2px;
+}
+
+#recording-indicator .ctrl-btn,
+#recording-indicator .ctrl-main {
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+#recording-indicator .ctrl-btn:hover,
+#recording-indicator .ctrl-main:hover {
+  opacity: 1;
+}
+
+#recording-indicator .ctrl-main {
+  position: relative;
+  gap: 5px;
+  overflow: hidden;
+}
+
+#recording-indicator .progress-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+#recording-indicator .prev-icon,
+#recording-indicator .next-icon {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+
+#recording-indicator .prev-icon {
+  border-right: 5px solid #fff;
+}
+
+#recording-indicator .next-icon {
+  border-left: 5px solid #fff;
 }
 
 /* Session List */
@@ -272,6 +331,15 @@ a:hover {
 .session-meta {
   color: #666;
   font-size: 10px;
+}
+
+.session-id {
+  color: #555;
+  font-size: 9px;
+  font-family: monospace;
+  opacity: 0.7;
+  user-select: all;
+  cursor: text;
 }
 
 .session-actions {
