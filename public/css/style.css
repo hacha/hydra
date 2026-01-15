@@ -372,6 +372,22 @@ a:hover {
   color: #f88;
 }
 
+.session-name-input {
+  background: #222;
+  border: 1px solid #555;
+  color: #fff;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  width: 100%;
+  max-width: 300px;
+  outline: none;
+}
+
+.session-name-input:focus {
+  border-color: #88f;
+}
+
 .session-list-footer {
   padding: 12px 16px;
   border-top: 1px solid #333;

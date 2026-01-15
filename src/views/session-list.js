@@ -21,12 +21,14 @@ export default function sessionList(state, emit) {
 
   const sessions = state.performance.sessions || {}
   const sessionArray = Object.values(sessions).sort((a, b) => b.createdAt - a.createdAt)
+  const editingSessionId = state.performance.editingSessionId
 
   const closeList = () => {
     emit('performance: hide session list')
   }
 
   const playSession = (sessionId) => {
+    if (editingSessionId === sessionId) return
     const url = new URL(window.location.href)
     url.search = `?playback=${sessionId}&start=0&speed=1`
     window.location.href = url.toString()
@@ -44,6 +46,50 @@ export default function sessionList(state, emit) {
     emit('performance: export session', sessionId)
   }
 
+  const startEdit = (sessionId, e) => {
+    e.stopPropagation()
+    emit('performance: start editing session', sessionId)
+  }
+
+  const finishEdit = (sessionId, newName, e) => {
+    e.stopPropagation()
+    const trimmedName = newName.trim()
+    if (trimmedName && trimmedName !== sessions[sessionId]?.name) {
+      emit('performance: rename session', { sessionId, newName: trimmedName })
+    }
+    emit('performance: stop editing session')
+  }
+
+  const cancelEdit = (e) => {
+    e.stopPropagation()
+    emit('performance: stop editing session')
+  }
+
+  const handleKeyDown = (sessionId, e) => {
+    if (e.key === 'Enter') {
+      finishEdit(sessionId, e.target.value, e)
+    } else if (e.key === 'Escape') {
+      cancelEdit(e)
+    }
+  }
+
+  const renderSessionName = (session) => {
+    if (editingSessionId === session.id) {
+      return html`
+        <input
+          type="text"
+          class="session-name-input"
+          value=${session.name}
+          onclick=${e => e.stopPropagation()}
+          onkeydown=${e => handleKeyDown(session.id, e)}
+          onblur=${e => finishEdit(session.id, e.target.value, e)}
+          onfocus=${e => e.target.select()}
+        />
+      `
+    }
+    return html`<div class="session-name">${session.name}</div>`
+  }
+
   return html`
     <div id="session-list-overlay" onclick=${closeList}>
       <div id="session-list-modal" onclick=${e => e.stopPropagation()}>
@@ -57,7 +103,7 @@ export default function sessionList(state, emit) {
             : sessionArray.map(session => html`
               <div class="session-item" onclick=${() => playSession(session.id)}>
                 <div class="session-info">
-                  <div class="session-name">${session.name}</div>
+                  ${renderSessionName(session)}
                   <div class="session-meta">
                     ${formatDate(session.createdAt)} ·
                     ${session.snapshotCount || 0} snapshots ·
@@ -66,6 +112,7 @@ export default function sessionList(state, emit) {
                   <div class="session-id" onclick=${e => e.stopPropagation()}>${session.id}</div>
                 </div>
                 <div class="session-actions">
+                  <button class="edit-btn" onclick=${(e) => startEdit(session.id, e)} title="Rename">✎</button>
                   <button class="export-btn" onclick=${(e) => exportSession(session.id, e)} title="Export">↓</button>
                   <button class="delete-btn" onclick=${(e) => deleteSession(session.id, e)} title="Delete">×</button>
                 </div>

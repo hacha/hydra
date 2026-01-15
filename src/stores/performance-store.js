@@ -95,7 +95,8 @@ export default function performanceStore(state, emitter) {
     sessions: {},
 
     // セッションリストUI
-    showSessionList: false
+    showSessionList: false,
+    editingSessionId: null
   }
 
   // 初期化時にメタデータを読み込み
@@ -498,6 +499,44 @@ export default function performanceStore(state, emitter) {
 
     state.performance.sessions = meta.sessions
     console.log(`[Performance] Session deleted: ${sessionId}`)
+    emitter.emit('render')
+  })
+
+  // セッション名編集開始
+  emitter.on('performance: start editing session', (sessionId) => {
+    state.performance.editingSessionId = sessionId
+    emitter.emit('render')
+    // 次のレンダリング後にinputにフォーカス
+    setTimeout(() => {
+      const input = document.querySelector('.session-name-input')
+      if (input) input.focus()
+    }, 0)
+  })
+
+  // セッション名編集終了
+  emitter.on('performance: stop editing session', () => {
+    state.performance.editingSessionId = null
+    emitter.emit('render')
+  })
+
+  // セッション名変更
+  emitter.on('performance: rename session', ({ sessionId, newName }) => {
+    // メタデータを更新
+    const meta = storage.getMeta()
+    if (meta.sessions[sessionId]) {
+      meta.sessions[sessionId].name = newName
+      storage.saveMeta(meta)
+    }
+
+    // セッションデータも更新
+    const session = storage.getSession(sessionId)
+    if (session) {
+      session.name = newName
+      storage.saveSession(session)
+    }
+
+    state.performance.sessions = meta.sessions
+    console.log(`[Performance] Session renamed: ${sessionId} -> ${newName}`)
     emitter.emit('render')
   })
 
