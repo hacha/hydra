@@ -118,6 +118,11 @@ export default function performanceStore(state, emitter) {
       emitter.emit('performance: start playback', sessionId, start, speed)
     }
 
+    if (params.has('resume')) {
+      const sessionId = params.get('resume')
+      emitter.emit('performance: resume session', sessionId)
+    }
+
     // /sessions/ パスでセッション一覧を表示
     if (window.location.pathname.endsWith('/sessions') || window.location.pathname.endsWith('/sessions/')) {
       emitter.emit('performance: show session list')
@@ -537,6 +542,46 @@ export default function performanceStore(state, emitter) {
 
     state.performance.sessions = meta.sessions
     console.log(`[Performance] Session renamed: ${sessionId} -> ${newName}`)
+    emitter.emit('render')
+  })
+
+  // セッション再開（既存セッションの続きを録画）
+  emitter.on('performance: resume session', (sessionId) => {
+    if (state.performance.isRecording) {
+      console.warn('[Performance] Already recording')
+      return
+    }
+
+    const session = storage.getSession(sessionId)
+    if (!session) {
+      console.warn(`[Performance] Session not found: ${sessionId}`)
+      return
+    }
+
+    // 最新のスナップショットのコードをエディタに読み込み・実行
+    if (session.snapshots && session.snapshots.length > 0) {
+      const lastSnapshot = session.snapshots[session.snapshots.length - 1]
+      emitter.emit('editor: load code', lastSnapshot.code)
+      emitter.emit('repl: eval', lastSnapshot.code)
+    }
+
+    // 既存のdurationを考慮してrecordingStartTimeを計算
+    const meta = storage.getMeta()
+    const existingDuration = meta.sessions[sessionId]?.duration || 0
+
+    state.performance.isRecording = true
+    state.performance.currentSessionId = sessionId
+    state.performance.recordingStartTime = Date.now() - existingDuration
+    state.performance.snapshotCount = session.snapshots?.length || 0
+
+    // メタデータのlastSessionIdを更新
+    meta.lastSessionId = sessionId
+    storage.saveMeta(meta)
+
+    // セッションリストを閉じる
+    state.performance.showSessionList = false
+
+    console.log(`[Performance] Recording resumed: ${sessionId} (${state.performance.snapshotCount} existing snapshots)`)
     emitter.emit('render')
   })
 

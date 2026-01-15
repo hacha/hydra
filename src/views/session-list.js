@@ -46,6 +46,13 @@ export default function sessionList(state, emit) {
     emit('performance: export session', sessionId)
   }
 
+  const resumeSession = (sessionId, e) => {
+    e.stopPropagation()
+    const url = new URL(window.location.href)
+    url.search = `?resume=${sessionId}`
+    window.location.href = url.toString()
+  }
+
   const startEdit = (sessionId, e) => {
     e.stopPropagation()
     emit('performance: start editing session', sessionId)
@@ -112,6 +119,7 @@ export default function sessionList(state, emit) {
                   <div class="session-id" onclick=${e => e.stopPropagation()}>${session.id}</div>
                 </div>
                 <div class="session-actions">
+                  <button class="resume-btn" onclick=${(e) => resumeSession(session.id, e)} title="Resume recording">▶</button>
                   <button class="edit-btn" onclick=${(e) => startEdit(session.id, e)} title="Rename">✎</button>
                   <button class="export-btn" onclick=${(e) => exportSession(session.id, e)} title="Export">↓</button>
                   <button class="delete-btn" onclick=${(e) => deleteSession(session.id, e)} title="Delete">×</button>

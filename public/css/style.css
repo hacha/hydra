@@ -372,6 +372,11 @@ a:hover {
   color: #f88;
 }
 
+.session-actions .resume-btn:hover {
+  background: #363;
+  color: #8f8;
+}
+
 .session-name-input {
   background: #222;
   border: 1px solid #555;
