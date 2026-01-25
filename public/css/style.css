@@ -372,9 +372,14 @@ a:hover {
   color: #f88;
 }
 
+.session-actions .play-btn:hover {
+  background: #336;
+  color: #88f;
+}
+
 .session-actions .resume-btn:hover {
-  background: #363;
-  color: #8f8;
+  background: #633;
+  color: #f88;
 }
 
 .session-name-input {

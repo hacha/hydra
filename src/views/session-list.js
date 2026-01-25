@@ -108,7 +108,7 @@ export default function sessionList(state, emit) {
           ${sessionArray.length === 0
             ? html`<p class="no-sessions">No recorded sessions yet.<br>Press Ctrl+Shift+R to start recording.</p>`
             : sessionArray.map(session => html`
-              <div class="session-item" onclick=${() => playSession(session.id)}>
+              <div class="session-item">
                 <div class="session-info">
                   ${renderSessionName(session)}
                   <div class="session-meta">
@@ -116,10 +116,11 @@ export default function sessionList(state, emit) {
                     ${session.snapshotCount || 0} snapshots ·
                     ${formatDuration(session.duration)}
                   </div>
-                  <div class="session-id" onclick=${e => e.stopPropagation()}>${session.id}</div>
+                  <div class="session-id">${session.id}</div>
                 </div>
                 <div class="session-actions">
-                  <button class="resume-btn" onclick=${(e) => resumeSession(session.id, e)} title="Resume recording">▶</button>
+                  <button class="play-btn" onclick=${() => playSession(session.id)} title="Play">▶</button>
+                  <button class="resume-btn" onclick=${(e) => resumeSession(session.id, e)} title="Resume recording">●+</button>
                   <button class="edit-btn" onclick=${(e) => startEdit(session.id, e)} title="Rename">✎</button>
                   <button class="export-btn" onclick=${(e) => exportSession(session.id, e)} title="Export">↓</button>
                   <button class="delete-btn" onclick=${(e) => deleteSession(session.id, e)} title="Delete">×</button>
