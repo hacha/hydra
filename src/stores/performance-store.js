@@ -628,7 +628,7 @@ export default function performanceStore(state, emitter) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `hydra-session-${session.name.replace(/[^a-zA-Z0-9]/g, '-')}.json`
+    a.download = `hydra-session-${session.name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')}.json`
     a.click()
     URL.revokeObjectURL(url)
 
