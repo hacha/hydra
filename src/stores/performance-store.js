@@ -491,6 +491,40 @@ export default function performanceStore(state, emitter) {
     emitter.emit('render')
   })
 
+  // 任意のスナップショットへジャンプ
+  emitter.on('performance: seek to snapshot', (targetIndex) => {
+    if (!state.performance.isPlaying && !state.performance.isPaused) return
+
+    const sessionId = state.performance.playbackSessionId
+    const session = storage.getSession(sessionId)
+    if (!session) return
+
+    const index = Math.max(0, Math.min(targetIndex, session.snapshots.length - 1))
+    const snapshot = session.snapshots[index]
+
+    emitter.emit('editor: load code', snapshot.code)
+    emitter.emit('repl: eval', snapshot.code)
+
+    state.performance.playbackIndex = index + 1
+    state.performance.playbackProgress = 0
+
+    const prevSnapshot = index > 0 ? session.snapshots[index - 1] : null
+    const nextSnapshot = session.snapshots[index + 1]
+    state.performance.currentSnapshotTime = prevSnapshot ? prevSnapshot.timestamp : 0
+    state.performance.nextSnapshotTime = nextSnapshot ? nextSnapshot.timestamp : snapshot.timestamp
+
+    if (state.performance.isPlaying) {
+      state.performance.playbackStartTime = Date.now() - snapshot.timestamp / state.performance.playbackSpeed
+      if (state.performance.playbackTimerId) {
+        clearTimeout(state.performance.playbackTimerId)
+      }
+      scheduleNextSnapshot(session, emitter, state)
+    }
+
+    console.log(`[Performance] Seeked to snapshot ${index}`)
+    emitter.emit('render')
+  })
+
   // セッション削除
   emitter.on('performance: delete session', (sessionId) => {
     storage.deleteSession(sessionId)
