@@ -67,6 +67,28 @@ export default defineConfig(({ mode }) => {
                     global: 'globalThis'
                 }
             }
+        },
+        build: {
+            rollupOptions: {
+                output: {
+                    manualChunks(id) {
+                        if (id.includes('node_modules')) {
+                            if (id.includes('@codemirror') || id.includes('@lezer') || id.includes('codemirror')) {
+                                return 'codemirror'
+                            }
+                            if (id.includes('i18next')) {
+                                return 'i18n'
+                            }
+                            if (id.includes('socket.io') || id.includes('simple-peer')) {
+                                return 'networking'
+                            }
+                            if (id.includes('js-beautify') || id.includes('acorn')) {
+                                return 'utilities'
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 })
