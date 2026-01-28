@@ -485,6 +485,26 @@ export default function store(state, emitter) {
         updateAudioVisualizerState()
       }
     })
+
+    // Reset key states when window loses focus (prevents stuck keys)
+    window.addEventListener('blur', () => {
+      isCtrlPressed = false
+      isVPressed = false
+      isAPressed = false
+      updatePreviewState()
+      updateAudioVisualizerState()
+    })
+
+    // Reset key states when page becomes hidden (tab switch, etc.)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        isCtrlPressed = false
+        isVPressed = false
+        isAPressed = false
+        updatePreviewState()
+        updateAudioVisualizerState()
+      }
+    })
   }
 
   // emitter.on('mutate sketch', function () {
