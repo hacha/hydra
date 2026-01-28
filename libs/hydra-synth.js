@@ -1475,6 +1475,13 @@ class GeneratorFactory {
           synth: this,
           method: 'noi'
         });
+      } else if (method === 'noise1') {
+        this.generators.noi1 = this.generators.noise1;
+        this.changeListener({
+          type: 'add',
+          synth: this,
+          method: 'noi1'
+        });
       } else if (method === 'shape') {
         this.generators.sha = this.generators.shape;
         this.changeListener({
@@ -1888,6 +1895,20 @@ var _default = () => [{
     default: 0.1
   }],
   glsl: `   return vec4(vec3(_noise(vec3(_st*scale, offset*time))), 1.0);`
+}, {
+  name: 'noise1',
+  type: 'src',
+  inputs: [{
+    type: 'float',
+    name: 'scale',
+    default: 1
+  }, {
+    type: 'float',
+    name: 'offset',
+    default: 0
+  }],
+  glsl: `   // Output range: -1 to +1 (same as noise() for consistency)
+   return vec4(vec3(_noise1d(time * scale + offset)), 1.0);`
 }, {
   name: 'voronoi',
   type: 'src',
@@ -2775,6 +2796,29 @@ var _default = {
         vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
         return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
     }`
+  },
+  _noise1d: {
+    type: 'util',
+    glsl: `
+float _hash1d(float n) {
+  return fract(sin(n * 127.1) * 43758.5453123);
+}
+
+float _noise1d(float x) {
+  float i = floor(x);
+  float f = fract(x);
+
+  // Quintic Hermite curve (C2 continuous)
+  float u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+
+  // Gradient values at integer points
+  float a = _hash1d(i) * 2.0 - 1.0;
+  float b = _hash1d(i + 1.0) * 2.0 - 1.0;
+
+  // Gradient noise interpolation, scaled to match _noise() output range (-1 to +1)
+  return mix(a * f, b * (f - 1.0), u) * 2.0;
+}
+`
   }
 };
 exports.default = _default;
