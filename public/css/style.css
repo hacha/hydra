@@ -452,3 +452,105 @@ a:hover {
 .import-label input[type="file"] {
   display: none;
 }
+
+/* YouTube Overlay */
+#youtube-overlay {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 110;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid #333;
+  border-radius: 4px;
+  font-family: monospace;
+  color: #fff;
+  overflow: hidden;
+}
+
+
+#youtube-overlay .youtube-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.9);
+  font-size: 10px;
+  color: #888;
+  gap: 8px;
+}
+
+#youtube-overlay .youtube-header-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+#youtube-overlay .youtube-close-btn,
+#youtube-overlay .youtube-clear-btn {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+#youtube-overlay .youtube-close-btn:hover,
+#youtube-overlay .youtube-clear-btn:hover {
+  color: #fff;
+}
+
+#youtube-overlay.youtube-input-mode {
+  padding: 0;
+}
+
+#youtube-overlay .youtube-url-form {
+  display: flex;
+  padding: 8px;
+  gap: 4px;
+}
+
+#youtube-overlay .youtube-url-input {
+  width: 200px;
+  background: #222;
+  border: 1px solid #444;
+  color: #fff;
+  padding: 5px 8px;
+  font-family: monospace;
+  font-size: 11px;
+  border-radius: 3px;
+  outline: none;
+}
+
+#youtube-overlay .youtube-url-input:focus {
+  border-color: #666;
+}
+
+#youtube-overlay .youtube-url-input::placeholder {
+  color: #666;
+}
+
+#youtube-overlay .youtube-load-btn {
+  background: #444;
+  border: none;
+  color: #fff;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 11px;
+  border-radius: 3px;
+}
+
+#youtube-overlay .youtube-load-btn:hover {
+  background: #555;
+}
+
+#youtube-player-container {
+  min-width: 200px;
+  min-height: 200px;
+  background: #000;
+}
+
+#youtube-player-container iframe {
+  display: block;
+}

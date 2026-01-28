@@ -9,5 +9,7 @@ export default {
     'Shift-Ctrl-T': 'tap-tempo:toggle',
     // Performance recording
     'Shift-Ctrl-P': 'performance: toggle recording',
-    'Shift-Ctrl-M': 'performance: toggle session list'
+    'Shift-Ctrl-M': 'performance: toggle session list',
+    // YouTube
+    'Shift-Ctrl-Y': 'youtube: toggle visibility'
 }

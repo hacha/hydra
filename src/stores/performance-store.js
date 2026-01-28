@@ -146,7 +146,24 @@ export default function performanceStore(state, emitter) {
       id: sessionId,
       name: `Session ${formatDateTime(now)}`,
       createdAt: now,
-      snapshots: []
+      snapshots: [],
+      // YouTube情報（YouTubeが設定されている場合のみ）
+      youtube: state.youtube?.videoId ? {
+        videoId: state.youtube.videoId,
+        startTime: 0 // YouTube同期開始時に設定
+      } : null
+    }
+
+    // YouTube同期開始
+    if (state.youtube?.videoId) {
+      emitter.emit('youtube: start sync recording')
+      // 同期開始後に開始時刻を保存
+      setTimeout(() => {
+        if (state.youtube?.baseYoutubeTime !== null) {
+          session.youtube.startTime = state.youtube.baseYoutubeTime
+          storage.saveSession(session)
+        }
+      }, 50)
     }
 
     storage.saveSession(session)
@@ -204,6 +221,9 @@ export default function performanceStore(state, emitter) {
     state.performance.currentSessionId = null
     state.performance.recordingStartTime = null
 
+    // YouTube同期停止
+    emitter.emit('youtube: stop sync')
+
     emitter.emit('render')
   })
 
@@ -227,11 +247,24 @@ export default function performanceStore(state, emitter) {
 
     const timestamp = Date.now() - state.performance.recordingStartTime
 
-    session.snapshots.push({
+    const snapshot = {
       timestamp,
       code,
       absoluteTime: Date.now()
-    })
+    }
+
+    // YouTube再生位置を追加（YouTubeが同期中の場合）
+    if (state.youtube?.syncMode === 'recording' && state.youtube?.isReady) {
+      let youtubeTime = null
+      emitter.emit('youtube: get current time', (time) => {
+        youtubeTime = time
+      })
+      if (youtubeTime !== null) {
+        snapshot.youtubeTime = youtubeTime
+      }
+    }
+
+    session.snapshots.push(snapshot)
 
     storage.saveSession(session)
     state.performance.snapshotCount = session.snapshots.length
@@ -271,6 +304,15 @@ export default function performanceStore(state, emitter) {
     state.performance.playbackTotal = session.snapshots.length
     emitter.emit('editor: load code', initialSnapshot.code)
     emitter.emit('repl: eval', initialSnapshot.code)
+
+    // YouTube同期再生開始（セッションにYouTube情報がある場合）
+    if (session.youtube?.videoId) {
+      const youtubeStartTime = initialSnapshot.youtubeTime ?? session.youtube.startTime ?? 0
+      emitter.emit('youtube: start sync playback', {
+        videoId: session.youtube.videoId,
+        startTime: youtubeStartTime
+      })
+    }
 
     // playbackIndexは次に再生するスナップショットを指す
     state.performance.playbackIndex = initialIndex + 1
@@ -327,6 +369,9 @@ export default function performanceStore(state, emitter) {
     state.performance.playbackIndex = 0
     state.performance.playbackProgress = 0
 
+    // YouTube同期停止
+    emitter.emit('youtube: stop sync')
+
     console.log('[Performance] Playback stopped')
     emitter.emit('render')
   })
@@ -349,6 +394,9 @@ export default function performanceStore(state, emitter) {
     state.performance.isPaused = true
     state.performance.pausedAt = Date.now()
 
+    // YouTube一時停止
+    emitter.emit('youtube: sync pause')
+
     console.log('[Performance] Playback paused')
     emitter.emit('render')
   })
@@ -367,6 +415,9 @@ export default function performanceStore(state, emitter) {
 
     state.performance.isPlaying = true
     state.performance.isPaused = false
+
+    // YouTube再開
+    emitter.emit('youtube: sync resume')
 
     console.log('[Performance] Playback resumed')
     emitter.emit('render')
@@ -428,6 +479,11 @@ export default function performanceStore(state, emitter) {
     emitter.emit('editor: load code', snapshot.code)
     emitter.emit('repl: eval', snapshot.code)
 
+    // YouTubeシーク
+    if (snapshot.youtubeTime !== undefined) {
+      emitter.emit('youtube: sync seek', snapshot.youtubeTime)
+    }
+
     // playbackIndex を更新（次に再生するのは targetIndex + 1）
     state.performance.playbackIndex = targetIndex + 1
     state.performance.playbackProgress = 0
@@ -469,6 +525,11 @@ export default function performanceStore(state, emitter) {
     emitter.emit('editor: load code', snapshot.code)
     emitter.emit('repl: eval', snapshot.code)
 
+    // YouTubeシーク
+    if (snapshot.youtubeTime !== undefined) {
+      emitter.emit('youtube: sync seek', snapshot.youtubeTime)
+    }
+
     // playbackIndex を更新
     state.performance.playbackIndex = targetIndex + 1
     state.performance.playbackProgress = 0
@@ -504,6 +565,11 @@ export default function performanceStore(state, emitter) {
 
     emitter.emit('editor: load code', snapshot.code)
     emitter.emit('repl: eval', snapshot.code)
+
+    // YouTubeシーク
+    if (snapshot.youtubeTime !== undefined) {
+      emitter.emit('youtube: sync seek', snapshot.youtubeTime)
+    }
 
     state.performance.playbackIndex = index + 1
     state.performance.playbackProgress = 0

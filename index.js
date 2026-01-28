@@ -6,6 +6,7 @@ import extensionStore from './src/stores/extension-store.js'
 import editorStore from './src/stores/editor-store.js'
 import galleryStore from './src/stores/gallery-store.js'
 import performanceStore from './src/stores/performance-store.js'
+import youtubeStore from './src/stores/youtube-store.js'
 
 import mainView from './src/views/main.js'
 
@@ -15,6 +16,7 @@ app.use(store)
 app.use(editorStore)
 app.use(galleryStore)
 app.use(performanceStore)
+app.use(youtubeStore)
 
 app.use(languageStore)
 app.use(extensionStore)

@@ -27,7 +27,13 @@ npm run publish
 - Component-based UI structure in `/src/views/`
 
 ### Key Components
-- **CodeMirror 6**: Code editor with custom keybindings and themes (`/src/views/cm6-editor/`)
+- **CodeMirror**: Code editor with custom keybindings and themes
+  - **Note**: Both CM5 and CM6 implementations exist. Currently **CM5 is active**:
+    - CM5 (active): `/src/views/editor/` - uses `codemirror-minified` (v5.65.0)
+    - CM6 (inactive): `/src/views/cm6-editor/` - uses `codemirror` (v6.0.1)
+  - Keymaps for CM5: `/src/views/editor/keymaps.js`
+  - Keymaps for CM6: `/src/views/cm6-editor/hydra-keymaps.js`
+  - Switch in `/src/views/EditorComponent.js` (import line)
 - **hydra-synth**: Core visual synthesis engine (npm module)
 - **rtc-patch-bay**: WebRTC networking for collaborative features (`/src/lib/patch-bay/`)
 - **P5.js integration**: Available through P5 wrapper (`/src/lib/p5-wrapper.js`)
@@ -62,7 +68,7 @@ docker-compose --profile prod-https up -d
 
 - **Visual Synthesis**: hydra-synth library
 - **Networking**: WebRTC via rtc-patch-bay, Socket.io for signaling
-- **Editor**: CodeMirror 6 with custom extensions
+- **Editor**: CodeMirror 5 (active) / CodeMirror 6 (inactive) with custom extensions
 - **Internationalization**: i18next
 - **Additional Libraries**: P5.js, acorn (JS parsing), js-beautify (code formatting)
 
