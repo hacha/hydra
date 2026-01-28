@@ -3493,7 +3493,7 @@ var _default = {
       return this;
     };
 
-    Array.prototype.ease = function (ease = 'linear') {
+    Array.prototype.ease = function (ease = 'linear', speed) {
       if (typeof ease == 'function') {
         this._smooth = 1;
         this._ease = ease;
@@ -3502,65 +3502,69 @@ var _default = {
         this._ease = _easingFunctions.default[ease];
       }
 
+      if (speed !== undefined) {
+        this._speed = speed;
+      }
+
       return this;
     };
 
     Array.prototype.e = Array.prototype.ease;
 
-    Array.prototype.lin = function () {
-      return this.ease('linear');
+    Array.prototype.lin = function (speed) {
+      return this.ease('linear', speed);
     };
 
-    Array.prototype.sin = function () {
-      return this.ease('sin');
+    Array.prototype.sin = function (speed) {
+      return this.ease('sin', speed);
     };
 
-    Array.prototype.eiCubic = function () {
-      return this.ease('easeInCubic');
+    Array.prototype.eiCubic = function (speed) {
+      return this.ease('easeInCubic', speed);
     };
 
-    Array.prototype.eoCubic = function () {
-      return this.ease('easeOutCubic');
+    Array.prototype.eoCubic = function (speed) {
+      return this.ease('easeOutCubic', speed);
     };
 
-    Array.prototype.eCubic = function () {
-      return this.ease('easeInOutCubic');
+    Array.prototype.eCubic = function (speed) {
+      return this.ease('easeInOutCubic', speed);
     };
 
-    Array.prototype.eiQuad = function () {
-      return this.ease('easeInQuad');
+    Array.prototype.eiQuad = function (speed) {
+      return this.ease('easeInQuad', speed);
     };
 
-    Array.prototype.eoQuad = function () {
-      return this.ease('easeOutQuad');
+    Array.prototype.eoQuad = function (speed) {
+      return this.ease('easeOutQuad', speed);
     };
 
-    Array.prototype.eQuad = function () {
-      return this.ease('easeInOutQuad');
+    Array.prototype.eQuad = function (speed) {
+      return this.ease('easeInOutQuad', speed);
     };
 
-    Array.prototype.eiQuart = function () {
-      return this.ease('easeInQuart');
+    Array.prototype.eiQuart = function (speed) {
+      return this.ease('easeInQuart', speed);
     };
 
-    Array.prototype.eoQuart = function () {
-      return this.ease('easeOutQuart');
+    Array.prototype.eoQuart = function (speed) {
+      return this.ease('easeOutQuart', speed);
     };
 
-    Array.prototype.eQuart = function () {
-      return this.ease('easeInOutQuart');
+    Array.prototype.eQuart = function (speed) {
+      return this.ease('easeInOutQuart', speed);
     };
 
-    Array.prototype.eiQuint = function () {
-      return this.ease('easeInQuint');
+    Array.prototype.eiQuint = function (speed) {
+      return this.ease('easeInQuint', speed);
     };
 
-    Array.prototype.eoQuint = function () {
-      return this.ease('easeOutQuint');
+    Array.prototype.eoQuint = function (speed) {
+      return this.ease('easeOutQuint', speed);
     };
 
-    Array.prototype.eQuint = function () {
-      return this.ease('easeInOutQuint');
+    Array.prototype.eQuint = function (speed) {
+      return this.ease('easeInOutQuint', speed);
     };
 
     Array.prototype.offset = function (offset = 0.5) {
