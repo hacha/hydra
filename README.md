@@ -84,6 +84,7 @@
 - `?record=true` - ページ読み込み時に自動で記録開始
 - `?playback=<sessionId>` - 指定セッションを自動再生
 - `?playback=<sessionId>&start=<index>&speed=<倍率>` - 開始スナップショット番号（0始まり）と再生速度を指定
+- `?session=<url>` - 外部URLからセッションJSONをインポート（CORS対応が必要）
 
 #### YouTube連携機能
 セッション記録・再生時にYouTube動画と同期できます。DJ mixなどを流しながらライブコーディングを練習し、後からその音楽と共に再生することを想定しています。
