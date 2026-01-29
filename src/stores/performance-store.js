@@ -205,11 +205,16 @@ export default function performanceStore(state, emitter) {
         state.performance.sessions = meta.sessions
         console.log(`[Performance] Recording cancelled (no snapshots): ${sessionId}`)
       } else {
+        // セッションにdurationを保存
+        const duration = Date.now() - state.performance.recordingStartTime
+        session.duration = duration
+        storage.saveSession(session)
+
         // メタデータを更新
         const meta = storage.getMeta()
         if (meta.sessions[sessionId]) {
           meta.sessions[sessionId].snapshotCount = session.snapshots.length
-          meta.sessions[sessionId].duration = Date.now() - state.performance.recordingStartTime
+          meta.sessions[sessionId].duration = duration
           storage.saveMeta(meta)
           state.performance.sessions = meta.sessions
         }
@@ -752,6 +757,14 @@ export default function performanceStore(state, emitter) {
 
     storage.saveSession(importedSession)
 
+    // durationを計算（セッションデータにない場合はスナップショットから算出）
+    let duration = importedSession.duration
+    if (!duration && importedSession.snapshots.length > 0) {
+      const lastSnapshot = importedSession.snapshots[importedSession.snapshots.length - 1]
+      duration = lastSnapshot.timestamp || 0
+    }
+    importedSession.duration = duration
+
     // メタデータを更新
     const meta = storage.getMeta()
     meta.sessions[newId] = {
@@ -759,7 +772,7 @@ export default function performanceStore(state, emitter) {
       name: importedSession.name,
       createdAt: importedSession.createdAt,
       snapshotCount: importedSession.snapshots.length,
-      duration: importedSession.duration || 0
+      duration: duration || 0
     }
     storage.saveMeta(meta)
 
