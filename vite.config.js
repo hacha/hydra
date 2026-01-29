@@ -33,7 +33,7 @@ export default defineConfig(({ mode }) => {
         base: isDevelopment ? '' : '/hydra/',
         server: {
             port: parseInt(process.env.VITE_PORT || '5173'),
-            strictPort: false,
+            strictPort: true,
             host: true
         },
         plugins: [
