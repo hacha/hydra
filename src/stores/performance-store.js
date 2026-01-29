@@ -728,7 +728,11 @@ export default function performanceStore(state, emitter) {
       return
     }
 
-    const data = JSON.stringify(session, null, 2)
+    // nullのプロパティを除外してエクスポート
+    const exportData = Object.fromEntries(
+      Object.entries(session).filter(([_, v]) => v !== null)
+    )
+    const data = JSON.stringify(exportData, null, 2)
     const blob = new Blob([data], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
