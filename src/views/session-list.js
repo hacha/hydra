@@ -154,4 +154,7 @@ function handleImport(e, emit) {
     }
   }
   reader.readAsText(file)
+
+  // 同じファイルを再度選択できるようにinputをリセット
+  e.target.value = ''
 }

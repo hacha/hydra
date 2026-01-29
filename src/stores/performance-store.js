@@ -751,15 +751,25 @@ export default function performanceStore(state, emitter) {
       return
     }
 
-    // 新しいIDを割り当て（既存セッションとの衝突を避ける）
-    const newId = generateUUID()
-    const importedSession = {
-      ...sessionData,
-      id: newId,
-      name: sessionData.name + ' (imported)'
+    const meta = storage.getMeta()
+    const existingSession = meta.sessions[sessionData.id]
+
+    // 既存IDがある場合は上書き確認
+    if (existingSession) {
+      const overwrite = confirm(
+        `同じIDのセッション「${existingSession.name}」が既に存在します。\n上書きしますか？`
+      )
+      if (!overwrite) {
+        console.log('[Performance] Import cancelled by user')
+        return
+      }
     }
 
-    storage.saveSession(importedSession)
+    // 元のIDを維持（新規/上書き共通）
+    const importedSession = {
+      ...sessionData,
+      name: sessionData.name + ' (imported)'
+    }
 
     // durationを計算（セッションデータにない場合はスナップショットから算出）
     let duration = importedSession.duration
@@ -769,10 +779,12 @@ export default function performanceStore(state, emitter) {
     }
     importedSession.duration = duration
 
+    // セッションを保存
+    storage.saveSession(importedSession)
+
     // メタデータを更新
-    const meta = storage.getMeta()
-    meta.sessions[newId] = {
-      id: newId,
+    meta.sessions[sessionData.id] = {
+      id: sessionData.id,
       name: importedSession.name,
       createdAt: importedSession.createdAt,
       snapshotCount: importedSession.snapshots.length,
@@ -781,7 +793,7 @@ export default function performanceStore(state, emitter) {
     storage.saveMeta(meta)
 
     state.performance.sessions = meta.sessions
-    console.log(`[Performance] Session imported: ${newId}`)
+    console.log(`[Performance] Session imported: ${sessionData.id}`)
     emitter.emit('render')
   })
 }
