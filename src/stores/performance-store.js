@@ -123,6 +123,12 @@ export default function performanceStore(state, emitter) {
       emitter.emit('performance: resume session', sessionId)
     }
 
+    // 外部URLからセッションをインポート
+    if (params.has('session')) {
+      const sessionUrl = params.get('session')
+      emitter.emit('performance: import session from url', sessionUrl)
+    }
+
     // /sessions/ パスでセッション一覧を表示
     if (window.location.pathname.endsWith('/sessions') || window.location.pathname.endsWith('/sessions/')) {
       emitter.emit('performance: show session list')
@@ -795,6 +801,30 @@ export default function performanceStore(state, emitter) {
     state.performance.sessions = meta.sessions
     console.log(`[Performance] Session imported: ${sessionData.id}`)
     emitter.emit('render')
+  })
+
+  // URLからセッションをインポート
+  emitter.on('performance: import session from url', async (url) => {
+    if (!url) {
+      console.warn('[Performance] No session URL provided')
+      return
+    }
+
+    console.log(`[Performance] Fetching session from: ${url}`)
+
+    try {
+      const response = await fetch(url)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const sessionData = await response.json()
+      emitter.emit('performance: import session', sessionData)
+      emitter.emit('performance: show session list')
+    } catch (err) {
+      console.error('[Performance] Failed to fetch session:', err)
+      alert(`セッションの取得に失敗しました:\n${err.message}`)
+    }
   })
 }
 
