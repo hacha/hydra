@@ -1168,7 +1168,7 @@ function formatArguments(transform, startIndex, synthContext) {
       vecLen: 0 //  generateGlsl: null // function for creating glsl
 
     };
-    if (typedArg.type === 'float') typedArg.value = ensure_decimal_dot(input.default);
+    if (typedArg.type === 'float' && typeof input.default !== 'function') typedArg.value = ensure_decimal_dot(input.default);
 
     if (input.type.startsWith('vec')) {
       try {
@@ -1218,6 +1218,26 @@ function formatArguments(transform, startIndex, synthContext) {
 
         typedArg.isUniform = true; // }
       }
+    } else if (typeof input.default === 'function') {
+      // handle function as default value (no user arg provided)
+      typedArg.value = (context, props, batchId) => {
+        try {
+          const val = input.default(props);
+
+          if (typeof val === 'number') {
+            return val;
+          } else {
+            console.warn('function does not return a number', input.default);
+          }
+
+          return 0;
+        } catch (e) {
+          console.warn('ERROR', e);
+          return 0;
+        }
+      };
+
+      typedArg.isUniform = true;
     }
 
     if (startIndex < 0) {} else {
@@ -1568,6 +1588,8 @@ class GeneratorFactory {
         this.sourceClass.prototype.inv = this.sourceClass.prototype.invert;
       } else if (method === 'scale') {
         this.sourceClass.prototype.sca = this.sourceClass.prototype.scale;
+      } else if (method === 'aspect') {
+        this.sourceClass.prototype.asp = this.sourceClass.prototype.aspect;
       } else if (method === 'mult') {
         this.sourceClass.prototype.mul = this.sourceClass.prototype.mult;
       } else if (method === 'colorama') {
@@ -2078,6 +2100,19 @@ var _default = () => [{
   glsl: `   vec2 xy = _st - vec2(offsetX, offsetY);
    xy*=(1.0/vec2(amount*xMult, amount*yMult));
    xy+=vec2(offsetX, offsetY);
+   return xy;
+   `
+}, {
+  name: 'aspect',
+  type: 'coord',
+  inputs: [{
+    type: 'float',
+    name: 'ratio',
+    default: () => window.innerHeight / window.innerWidth
+  }],
+  glsl: `   vec2 xy = _st - vec2(0.5);
+   xy.y *= ratio;
+   xy += vec2(0.5);
    return xy;
    `
 }, {
@@ -3611,6 +3646,13 @@ var _default = {
       return this.ease('easeInOutQuint', speed);
     };
 
+    Array.prototype.saw = function () {
+      this._saw = true;
+      return this;
+    };
+
+    Array.prototype.s = Array.prototype.saw;
+
     Array.prototype.offset = function (offset = 0.5) {
       this._offset = offset % 1.0;
       return this;
@@ -3628,6 +3670,7 @@ var _default = {
       newArr._speed = this._speed;
       newArr._smooth = this._smooth;
       newArr._ease = this._ease;
+      newArr._saw = this._saw;
       return newArr;
     };
   },
@@ -3644,8 +3687,16 @@ var _default = {
 
       let _index = index - smooth / 2;
 
-      let currValue = arr[Math.floor(_index % arr.length)];
-      let nextValue = arr[Math.floor((_index + 1) % arr.length)];
+      let currIndex = Math.floor(_index % arr.length);
+      let nextIndex = Math.floor((_index + 1) % arr.length);
+      let currValue = arr[currIndex];
+      let nextValue = arr[nextIndex]; // saw mode: treat last-to-first transition as next cycle's first-to-second
+
+      if (arr._saw && currIndex === arr.length - 1 && nextIndex === 0) {
+        currValue = arr[0];
+        nextValue = arr[1 % arr.length];
+      }
+
       let t = Math.min(_index % 1 / smooth, 1);
       return ease(t) * (nextValue - currValue) + currValue;
     } else {
