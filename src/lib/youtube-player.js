@@ -132,6 +132,17 @@ class YouTubePlayerWrapper {
   }
 
   /**
+   * 動画の長さを取得
+   * @returns {number} 動画の長さ（秒）。広告再生中は広告の長さを返す可能性がある
+   */
+  getDuration() {
+    if (this.player && this.isReady) {
+      return this.player.getDuration()
+    }
+    return 0
+  }
+
+  /**
    * プレーヤーの状態を取得
    * @returns {number} PlayerState (-1:未開始, 0:終了, 1:再生中, 2:一時停止, 3:バッファリング, 5:キュー済み)
    */

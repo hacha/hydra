@@ -89,7 +89,8 @@ export default function youtubeStore(state, emitter) {
     seekDetectionTimerId: null,
     lastPolledTime: null,
     lastPollTimestamp: null,
-    ignoringSeek: false
+    ignoringSeek: false,
+    videoDuration: 0
   }
 
   // YouTube側seekの検知ポーリングを開始
@@ -100,10 +101,27 @@ export default function youtubeStore(state, emitter) {
     stopSeekDetection()
     state.youtube.lastPolledTime = youtubePlayer.getCurrentTime()
     state.youtube.lastPollTimestamp = Date.now()
+    // 動画本編のdurationを記録（広告検知用）
+    state.youtube.videoDuration = youtubePlayer.getDuration()
 
     state.youtube.seekDetectionTimerId = setInterval(() => {
       if (!state.youtube.isReady) return
       if (state.youtube.ignoringSeek) return
+
+      // 広告検知: getDuration()が本編と大きく異なる場合は広告再生中
+      // 広告中はgetCurrentTime()が広告の経過時間を返すため、seek検知をスキップ
+      const currentDuration = youtubePlayer.getDuration()
+      if (state.youtube.videoDuration > 0 && currentDuration > 0 &&
+          Math.abs(currentDuration - state.youtube.videoDuration) > 5) {
+        // durationが変わった → 広告再生中の可能性、スキップ
+        console.log(`[YouTube] Ad detected (duration changed: ${state.youtube.videoDuration.toFixed(0)}s → ${currentDuration.toFixed(0)}s), skipping seek detection`)
+        state.youtube.lastPollTimestamp = Date.now()
+        return
+      }
+      // 広告終了後にdurationが戻った場合、記録を更新
+      if (currentDuration > 0 && state.youtube.videoDuration === 0) {
+        state.youtube.videoDuration = currentDuration
+      }
 
       const currentTime = youtubePlayer.getCurrentTime()
       const now = Date.now()
@@ -120,6 +138,12 @@ export default function youtubeStore(state, emitter) {
       const timeDiff = Math.abs(currentTime - expectedTime)
 
       if (timeDiff > SEEK_THRESHOLD) {
+        // 追加ガード: currentTimeが動画本編の範囲外なら広告の可能性が高い
+        if (state.youtube.videoDuration > 0 && currentTime > state.youtube.videoDuration) {
+          state.youtube.lastPolledTime = currentTime
+          state.youtube.lastPollTimestamp = now
+          return
+        }
         console.log(`[YouTube] Seek detected: ${expectedTime.toFixed(1)}s → ${currentTime.toFixed(1)}s (diff: ${timeDiff.toFixed(1)}s)`)
         emitter.emit('youtube: on user seek', currentTime)
       }
