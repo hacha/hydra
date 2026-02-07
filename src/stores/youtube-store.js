@@ -48,6 +48,11 @@ export default function youtubeStore(state, emitter) {
       return
     }
 
+    // 広告による一時停止中はユーザー操作のpause/resumeを無視
+    if (state.youtube.pausedByAd) {
+      return
+    }
+
     // YouTube側で一時停止された場合 → セッション再生も一時停止
     if (event.data === 2 && prevState === 1) {
       console.log('[YouTube] Paused by user, pausing session playback')
@@ -90,7 +95,10 @@ export default function youtubeStore(state, emitter) {
     lastPolledTime: null,
     lastPollTimestamp: null,
     ignoringSeek: false,
-    videoDuration: 0
+    videoDuration: 0,
+
+    // 広告による一時停止中フラグ
+    pausedByAd: false
   }
 
   // YouTube側seekの検知ポーリングを開始
@@ -109,15 +117,36 @@ export default function youtubeStore(state, emitter) {
       if (state.youtube.ignoringSeek) return
 
       // 広告検知: getDuration()が本編と大きく異なる場合は広告再生中
-      // 広告中はgetCurrentTime()が広告の経過時間を返すため、seek検知をスキップ
       const currentDuration = youtubePlayer.getDuration()
-      if (state.youtube.videoDuration > 0 && currentDuration > 0 &&
-          Math.abs(currentDuration - state.youtube.videoDuration) > 5) {
-        // durationが変わった → 広告再生中の可能性、スキップ
-        console.log(`[YouTube] Ad detected (duration changed: ${state.youtube.videoDuration.toFixed(0)}s → ${currentDuration.toFixed(0)}s), skipping seek detection`)
+      const isAdPlaying = state.youtube.videoDuration > 0 && currentDuration > 0 &&
+          Math.abs(currentDuration - state.youtube.videoDuration) > 5
+
+      if (isAdPlaying) {
+        // 広告開始 → セッション一時停止
+        if (!state.youtube.pausedByAd) {
+          state.youtube.pausedByAd = true
+          console.log(`[YouTube] Ad started (duration: ${state.youtube.videoDuration.toFixed(0)}s → ${currentDuration.toFixed(0)}s), pausing session`)
+          state.youtube.ignoringStateChange = true
+          emitter.emit('performance: pause playback')
+          setTimeout(() => { state.youtube.ignoringStateChange = false }, 100)
+        }
         state.youtube.lastPollTimestamp = Date.now()
         return
       }
+
+      // 広告終了 → セッション再開
+      if (state.youtube.pausedByAd) {
+        state.youtube.pausedByAd = false
+        console.log('[YouTube] Ad ended, resuming session')
+        // ポーリング基準をリセットしてからセッション再開
+        state.youtube.lastPolledTime = youtubePlayer.getCurrentTime()
+        state.youtube.lastPollTimestamp = Date.now()
+        state.youtube.ignoringStateChange = true
+        emitter.emit('performance: resume playback')
+        setTimeout(() => { state.youtube.ignoringStateChange = false }, 100)
+        return
+      }
+
       // 広告終了後にdurationが戻った場合、記録を更新
       if (currentDuration > 0 && state.youtube.videoDuration === 0) {
         state.youtube.videoDuration = currentDuration
