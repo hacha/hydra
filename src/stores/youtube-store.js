@@ -48,6 +48,11 @@ export default function youtubeStore(state, emitter) {
       return
     }
 
+    // 広告による一時停止中はユーザー操作のpause/resumeを無視
+    if (state.youtube.pausedByAd) {
+      return
+    }
+
     // YouTube側で一時停止された場合 → セッション再生も一時停止
     if (event.data === 2 && prevState === 1) {
       console.log('[YouTube] Paused by user, pausing session playback')
@@ -83,8 +88,116 @@ export default function youtubeStore(state, emitter) {
     showUrlInput: false,
 
     // 双方向同期用（無限ループ防止）
-    ignoringStateChange: false
+    ignoringStateChange: false,
+
+    // YouTube側seekの検知用
+    seekDetectionTimerId: null,
+    lastPolledTime: null,
+    lastPollTimestamp: null,
+    ignoringSeek: false,
+    videoDuration: 0,
+
+    // 広告による一時停止中フラグ
+    pausedByAd: false
   }
+
+  // YouTube側seekの検知ポーリングを開始
+  const SEEK_POLL_INTERVAL = 300 // ms
+  const SEEK_THRESHOLD = 2.0 // 秒: この差以上ならseekと判定
+
+  function startSeekDetection() {
+    stopSeekDetection()
+    state.youtube.lastPolledTime = youtubePlayer.getCurrentTime()
+    state.youtube.lastPollTimestamp = Date.now()
+    // 動画本編のdurationを記録（広告検知用）
+    state.youtube.videoDuration = youtubePlayer.getDuration()
+
+    state.youtube.seekDetectionTimerId = setInterval(() => {
+      if (!state.youtube.isReady) return
+      if (state.youtube.ignoringSeek) return
+
+      // 広告検知: getDuration()が本編と大きく異なる場合は広告再生中
+      const currentDuration = youtubePlayer.getDuration()
+      const isAdPlaying = state.youtube.videoDuration > 0 && currentDuration > 0 &&
+          Math.abs(currentDuration - state.youtube.videoDuration) > 5
+
+      if (isAdPlaying) {
+        // 広告開始 → セッション一時停止
+        if (!state.youtube.pausedByAd) {
+          state.youtube.pausedByAd = true
+          console.log(`[YouTube] Ad started (duration: ${state.youtube.videoDuration.toFixed(0)}s → ${currentDuration.toFixed(0)}s), pausing session`)
+          state.youtube.ignoringStateChange = true
+          emitter.emit('performance: pause playback')
+          setTimeout(() => { state.youtube.ignoringStateChange = false }, 100)
+        }
+        state.youtube.lastPollTimestamp = Date.now()
+        return
+      }
+
+      // 広告終了 → セッション再開
+      if (state.youtube.pausedByAd) {
+        state.youtube.pausedByAd = false
+        console.log('[YouTube] Ad ended, resuming session')
+        // ポーリング基準をリセットしてからセッション再開
+        state.youtube.lastPolledTime = youtubePlayer.getCurrentTime()
+        state.youtube.lastPollTimestamp = Date.now()
+        state.youtube.ignoringStateChange = true
+        emitter.emit('performance: resume playback')
+        setTimeout(() => { state.youtube.ignoringStateChange = false }, 100)
+        return
+      }
+
+      // 広告終了後にdurationが戻った場合、記録を更新
+      if (currentDuration > 0 && state.youtube.videoDuration === 0) {
+        state.youtube.videoDuration = currentDuration
+      }
+
+      const currentTime = youtubePlayer.getCurrentTime()
+      const now = Date.now()
+      const elapsedSec = (now - state.youtube.lastPollTimestamp) / 1000
+
+      // 再生中の場合: 期待される時刻との差でseekを検知
+      // 一時停止中の場合: 前回の時刻との差でseekを検知
+      const playerState = youtubePlayer.getPlayerState()
+      const isPlaying = playerState === 1
+      const expectedTime = isPlaying
+        ? state.youtube.lastPolledTime + elapsedSec
+        : state.youtube.lastPolledTime
+
+      const timeDiff = Math.abs(currentTime - expectedTime)
+
+      if (timeDiff > SEEK_THRESHOLD) {
+        // 追加ガード: currentTimeが動画本編の範囲外なら広告の可能性が高い
+        if (state.youtube.videoDuration > 0 && currentTime > state.youtube.videoDuration) {
+          state.youtube.lastPolledTime = currentTime
+          state.youtube.lastPollTimestamp = now
+          return
+        }
+        console.log(`[YouTube] Seek detected: ${expectedTime.toFixed(1)}s → ${currentTime.toFixed(1)}s (diff: ${timeDiff.toFixed(1)}s)`)
+        emitter.emit('youtube: on user seek', currentTime)
+      }
+
+      state.youtube.lastPolledTime = currentTime
+      state.youtube.lastPollTimestamp = now
+    }, SEEK_POLL_INTERVAL)
+  }
+
+  function stopSeekDetection() {
+    if (state.youtube.seekDetectionTimerId) {
+      clearInterval(state.youtube.seekDetectionTimerId)
+      state.youtube.seekDetectionTimerId = null
+    }
+    state.youtube.lastPolledTime = null
+    state.youtube.lastPollTimestamp = null
+  }
+
+  // YouTube側でユーザーがseekした場合 → Hydra側をseek
+  emitter.on('youtube: on user seek', (youtubeTime) => {
+    if (state.youtube.syncMode !== 'playback') return
+
+    console.log(`[YouTube] Syncing Hydra to YouTube time: ${youtubeTime.toFixed(1)}s`)
+    emitter.emit('performance: seek to youtube time', youtubeTime)
+  })
 
   // YouTube URLを設定して動画を読み込み
   emitter.on('youtube: load video', async (url) => {
@@ -181,6 +294,7 @@ export default function youtubeStore(state, emitter) {
     state.youtube.syncMode = 'none'
     state.youtube.baseTime = null
     state.youtube.baseYoutubeTime = null
+    stopSeekDetection()
   })
 
   // 再生開始時にYouTube状態を同期
@@ -220,6 +334,12 @@ export default function youtubeStore(state, emitter) {
         youtubePlayer.seekTo(startTime)
         youtubePlayer.play()
         console.log('[YouTube] Playback started at', startTime)
+
+        // seek検知ポーリングを開始
+        // 少し待ってから開始（seekTo直後の時刻変動を避ける）
+        setTimeout(() => {
+          startSeekDetection()
+        }, 1000)
       } catch (e) {
         console.error('[YouTube] Failed to start playback:', e)
       }
@@ -234,6 +354,10 @@ export default function youtubeStore(state, emitter) {
       // 無限ループ防止フラグを立てる
       state.youtube.ignoringStateChange = true
       youtubePlayer.pause()
+      // 一時停止中もseek検知は継続（一時停止中にユーザーがseekする可能性がある）
+      // ただしlastPolledTimeを更新してfalse positiveを防ぐ
+      state.youtube.lastPolledTime = youtubePlayer.getCurrentTime()
+      state.youtube.lastPollTimestamp = Date.now()
       // 少し待ってからフラグを解除
       setTimeout(() => {
         state.youtube.ignoringStateChange = false
@@ -247,18 +371,28 @@ export default function youtubeStore(state, emitter) {
       // 無限ループ防止フラグを立てる
       state.youtube.ignoringStateChange = true
       youtubePlayer.play()
-      // 少し待ってからフラグを解除
+      // ポーリングのタイミング情報をリセット
       setTimeout(() => {
+        state.youtube.lastPolledTime = youtubePlayer.getCurrentTime()
+        state.youtube.lastPollTimestamp = Date.now()
         state.youtube.ignoringStateChange = false
       }, 100)
     }
   })
 
-  // シーク時の同期
+  // シーク時の同期（Hydra側 → YouTube）
   emitter.on('youtube: sync seek', (youtubeTime) => {
     if (state.youtube.syncMode === 'playback' && youtubeTime !== undefined && youtubeTime !== null) {
+      // 無限ループ防止: Hydra→YouTube seekをポーリングが検知しないようにする
+      state.youtube.ignoringSeek = true
       youtubePlayer.seekTo(youtubeTime)
       youtubePlayer.play()
+      // ポーリングのタイミング情報もリセット
+      setTimeout(() => {
+        state.youtube.lastPolledTime = youtubePlayer.getCurrentTime()
+        state.youtube.lastPollTimestamp = Date.now()
+        state.youtube.ignoringSeek = false
+      }, 500)
     }
   })
 
@@ -272,6 +406,7 @@ export default function youtubeStore(state, emitter) {
 
   // 動画をクリア
   emitter.on('youtube: clear', () => {
+    stopSeekDetection()
     youtubePlayer.destroy()
     state.youtube.isReady = false
     state.youtube.videoId = null
@@ -283,6 +418,7 @@ export default function youtubeStore(state, emitter) {
 
   // 破棄
   emitter.on('youtube: destroy', () => {
+    stopSeekDetection()
     youtubePlayer.destroy()
     state.youtube.isReady = false
     state.youtube.videoId = null
