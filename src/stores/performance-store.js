@@ -577,8 +577,8 @@ export default function performanceStore(state, emitter) {
     emitter.emit('editor: load code', snapshot.code)
     emitter.emit('repl: eval', snapshot.code)
 
-    // YouTubeシーク
-    if (snapshot.youtubeTime !== undefined) {
+    // YouTubeシーク（YouTube側からのseek時は不要 → 無限ループ防止）
+    if (snapshot.youtubeTime !== undefined && !state.performance._seekFromYoutube) {
       emitter.emit('youtube: sync seek', snapshot.youtubeTime)
     }
 
@@ -600,6 +600,45 @@ export default function performanceStore(state, emitter) {
 
     console.log(`[Performance] Seeked to snapshot ${index}`)
     emitter.emit('render')
+  })
+
+  // YouTube時刻から最も近いスナップショットへseek
+  emitter.on('performance: seek to youtube time', (youtubeTime) => {
+    if (!state.performance.isPlaying && !state.performance.isPaused) return
+
+    const sessionId = state.performance.playbackSessionId
+    const session = storage.getSession(sessionId)
+    if (!session) return
+
+    // youtubeTimeを持つスナップショットから最も近いものを探す
+    let bestIndex = -1
+    let bestDiff = Infinity
+
+    for (let i = 0; i < session.snapshots.length; i++) {
+      const snap = session.snapshots[i]
+      if (snap.youtubeTime === undefined || snap.youtubeTime === null) continue
+      const diff = Math.abs(snap.youtubeTime - youtubeTime)
+      if (diff < bestDiff) {
+        bestDiff = diff
+        bestIndex = i
+      }
+    }
+
+    if (bestIndex === -1) {
+      console.warn('[Performance] No snapshot with youtubeTime found')
+      return
+    }
+
+    // 現在と同じスナップショットなら何もしない
+    const currentIndex = state.performance.playbackIndex - 1
+    if (bestIndex === currentIndex) return
+
+    console.log(`[Performance] YouTube seek → snapshot ${bestIndex} (youtubeTime: ${session.snapshots[bestIndex].youtubeTime.toFixed(1)}s, target: ${youtubeTime.toFixed(1)}s)`)
+
+    // 既存のseek to snapshotを使用（ただしYouTube sync seekは不要なのでフラグで制御）
+    state.performance._seekFromYoutube = true
+    emitter.emit('performance: seek to snapshot', bestIndex)
+    state.performance._seekFromYoutube = false
   })
 
   // セッション削除
