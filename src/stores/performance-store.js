@@ -255,14 +255,22 @@ export default function performanceStore(state, emitter) {
       absoluteTime: Date.now()
     }
 
-    // YouTube再生位置を追加（YouTubeが同期中の場合）
-    if (state.youtube?.syncMode === 'recording' && state.youtube?.isReady) {
+    // YouTube再生位置を追加（YouTubeが読み込まれている場合）
+    if (state.youtube?.videoId && state.youtube?.isReady) {
       let youtubeTime = null
       emitter.emit('youtube: get current time', (time) => {
         youtubeTime = time
       })
       if (youtubeTime !== null) {
         snapshot.youtubeTime = youtubeTime
+      }
+
+      // autoBufferにYouTube情報がまだない場合は追加
+      if (!buffer.youtube) {
+        buffer.youtube = {
+          videoId: state.youtube.videoId,
+          startTime: youtubeTime
+        }
       }
     }
 
