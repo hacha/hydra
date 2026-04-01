@@ -3677,35 +3677,41 @@ var _default = {
       return newArr;
     };
   },
-  getValue: (arr = []) => ({
-    time,
-    bpm
-  }) => {
-    let speed = arr._speed ? arr._speed : 1;
-    let smooth = arr._smooth ? arr._smooth : 0;
-    let index = time * speed * (bpm / 60) + (arr._offset || 0);
+  getValue: function getValue(arr = []) {
+    return ({
+      time,
+      bpm
+    }) => {
+      let speed = arr._speed ? arr._speed : 1;
+      let smooth = arr._smooth ? arr._smooth : 0;
+      let index = time * speed * (bpm / 60) + (arr._offset || 0);
 
-    if (smooth !== 0) {
-      let ease = arr._ease ? arr._ease : _easingFunctions.default['linear'];
+      const resolve = val => Array.isArray(val) ? getValue(val)({
+        time,
+        bpm
+      }) : val;
 
-      let _index = index - smooth / 2;
+      if (smooth !== 0) {
+        let ease = arr._ease ? arr._ease : _easingFunctions.default['linear'];
 
-      let currIndex = Math.floor(_index % arr.length);
-      let nextIndex = Math.floor((_index + 1) % arr.length);
-      let currValue = arr[currIndex];
-      let nextValue = arr[nextIndex]; // saw mode: treat last-to-first transition as next cycle's first-to-second
+        let _index = index - smooth / 2;
 
-      if (arr._saw && currIndex === arr.length - 1 && nextIndex === 0) {
-        currValue = arr[0];
-        nextValue = arr[1 % arr.length];
+        let currIndex = Math.floor(_index % arr.length);
+        let nextIndex = Math.floor((_index + 1) % arr.length);
+        let currValue = resolve(arr[currIndex]);
+        let nextValue = resolve(arr[nextIndex]); // saw mode: treat last-to-first transition as next cycle's first-to-second
+
+        if (arr._saw && currIndex === arr.length - 1 && nextIndex === 0) {
+          currValue = resolve(arr[0]);
+          nextValue = resolve(arr[1 % arr.length]);
+        }
+
+        let t = Math.min(_index % 1 / smooth, 1);
+        return ease(t) * (nextValue - currValue) + currValue;
+      } else {
+        return resolve(arr[Math.floor(index % arr.length)]);
       }
-
-      let t = Math.min(_index % 1 / smooth, 1);
-      return ease(t) * (nextValue - currValue) + currValue;
-    } else {
-      const val = arr[Math.floor(index % arr.length)];
-      return arr[Math.floor(index % arr.length)];
-    }
+    };
   }
 };
 exports.default = _default;
