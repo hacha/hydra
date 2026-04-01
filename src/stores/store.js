@@ -475,6 +475,8 @@ export default function store(state, emitter) {
     window.addEventListener('keyup', (event) => {
       if (event.key === 'Control') {
         isCtrlPressed = false
+        isVPressed = false
+        isAPressed = false
         updatePreviewState()
         updateAudioVisualizerState()
       } else if (event.key === 'v' || event.key === 'V') {
