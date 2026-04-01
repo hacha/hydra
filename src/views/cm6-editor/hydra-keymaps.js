@@ -6,7 +6,7 @@ const keymap = {
     'Shift-Ctrl-f': 'editor: format code',
     'Shift-Ctrl-h': 'ui: hide all',
     // Performance recording
-    'Shift-Ctrl-p': 'performance: toggle recording',
+    'Shift-Ctrl-p': 'performance: save session',
     'Shift-Ctrl-m': 'performance: toggle session list',
     // YouTube
     'Shift-Ctrl-y': 'youtube: toggle visibility'

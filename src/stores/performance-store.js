@@ -1,11 +1,13 @@
 /**
  * Performance Recording Store
- * VJパフォーマンスのコード実行履歴を記録・再生する機能
+ * VJパフォーマンスのコード実行履歴を自動録画・再生する機能
+ * ページロード時に自動で録画を開始し、Shift-Ctrl-Pでセッションとして保存する
  */
 
 // ローカルストレージのキー
 const STORAGE_META_KEY = 'hydra_performance_meta'
 const STORAGE_SESSION_PREFIX = 'hydra_perf_'
+const AUTO_BUFFER_KEY = 'hydra_perf_autobuffer'
 
 // UUID生成
 function generateUUID() {
@@ -70,14 +72,42 @@ const storage = {
   }
 }
 
+// 自動録画バッファ操作（通常セッションとは別のキーで管理）
+const autoBuffer = {
+  get() {
+    try {
+      const data = localStorage.getItem(AUTO_BUFFER_KEY)
+      return data ? JSON.parse(data) : null
+    } catch (e) {
+      console.error('Failed to load auto-buffer:', e)
+      return null
+    }
+  },
+
+  save(buffer) {
+    try {
+      localStorage.setItem(AUTO_BUFFER_KEY, JSON.stringify(buffer))
+    } catch (e) {
+      console.error('Failed to save auto-buffer:', e)
+    }
+  },
+
+  clear() {
+    try {
+      localStorage.removeItem(AUTO_BUFFER_KEY)
+    } catch (e) {
+      console.error('Failed to clear auto-buffer:', e)
+    }
+  }
+}
+
 export default function performanceStore(state, emitter) {
   // 状態初期化
   state.performance = {
-    // 記録状態
-    isRecording: false,
-    currentSessionId: null,
-    recordingStartTime: null,
+    // 自動録画状態
+    autoBufferStartTime: null,
     snapshotCount: 0,
+    savedMessage: null,
 
     // 再生状態
     isPlaying: false,
@@ -99,17 +129,37 @@ export default function performanceStore(state, emitter) {
     editingSessionId: null
   }
 
-  // 初期化時にメタデータを読み込み
+  // 自動録画バッファを新規作成する内部関数
+  function startAutoBuffer() {
+    autoBuffer.clear()
+    const now = Date.now()
+    const buffer = {
+      id: generateUUID(),
+      name: `Session ${formatDateTime(now)}`,
+      createdAt: now,
+      snapshots: [],
+      youtube: state.youtube?.videoId ? {
+        videoId: state.youtube.videoId,
+        startTime: 0
+      } : null
+    }
+    autoBuffer.save(buffer)
+    state.performance.autoBufferStartTime = now
+    state.performance.snapshotCount = 0
+    return buffer
+  }
+
+  // 初期化時にメタデータを読み込み、自動録画を開始
   emitter.on('DOMContentLoaded', () => {
     const meta = storage.getMeta()
     state.performance.sessions = meta.sessions
 
+    // 前回の未保存バッファを破棄して新規自動録画開始
+    startAutoBuffer()
+    console.log('[Performance] Auto-recording started')
+
     // URLパラメータをチェック
     const params = new URLSearchParams(window.location.search)
-
-    if (params.has('record') && params.get('record') === 'true') {
-      emitter.emit('performance: start recording')
-    }
 
     if (params.has('playback')) {
       const sessionId = params.get('playback')
@@ -135,128 +185,69 @@ export default function performanceStore(state, emitter) {
     }
   })
 
-  // 記録開始
-  emitter.on('performance: start recording', () => {
-    if (state.performance.isRecording) return
-
-    const sessionId = generateUUID()
-    const now = Date.now()
-
-    state.performance.isRecording = true
-    state.performance.currentSessionId = sessionId
-    state.performance.recordingStartTime = now
-    state.performance.snapshotCount = 0
-
-    // 新しいセッションを作成
-    const session = {
-      id: sessionId,
-      name: `Session ${formatDateTime(now)}`,
-      createdAt: now,
-      snapshots: [],
-      // YouTube情報（YouTubeが設定されている場合のみ）
-      youtube: state.youtube?.videoId ? {
-        videoId: state.youtube.videoId,
-        startTime: 0 // YouTube同期開始時に設定
-      } : null
-    }
-
-    // YouTube同期開始
-    if (state.youtube?.videoId) {
-      emitter.emit('youtube: start sync recording')
-      // 同期開始後に開始時刻を保存
+  // セッション保存（自動録画バッファを正式セッションに昇格）
+  emitter.on('performance: save session', () => {
+    const buffer = autoBuffer.get()
+    if (!buffer || buffer.snapshots.length === 0) {
+      console.log('[Performance] No snapshots to save')
+      state.performance.savedMessage = 'No snapshots to save'
+      emitter.emit('render')
       setTimeout(() => {
-        if (state.youtube?.baseYoutubeTime !== null) {
-          session.youtube.startTime = state.youtube.baseYoutubeTime
-          storage.saveSession(session)
-        }
-      }, 50)
+        state.performance.savedMessage = null
+        emitter.emit('render')
+      }, 2000)
+      return
     }
 
-    storage.saveSession(session)
+    // durationを設定
+    buffer.duration = Date.now() - state.performance.autoBufferStartTime
+
+    // 正式セッションとして保存
+    storage.saveSession(buffer)
 
     // メタデータを更新
     const meta = storage.getMeta()
-    meta.sessions[sessionId] = {
-      id: sessionId,
-      name: session.name,
-      createdAt: now,
-      snapshotCount: 0
+    meta.sessions[buffer.id] = {
+      id: buffer.id,
+      name: buffer.name,
+      createdAt: buffer.createdAt,
+      snapshotCount: buffer.snapshots.length,
+      duration: buffer.duration
     }
-    meta.lastSessionId = sessionId
+    meta.lastSessionId = buffer.id
     storage.saveMeta(meta)
-
     state.performance.sessions = meta.sessions
 
-    console.log(`[Performance] Recording started: ${sessionId}`)
+    const snapshotCount = buffer.snapshots.length
+    console.log(`[Performance] Session saved: ${buffer.id} (${snapshotCount} snapshots)`)
+
+    // 保存確認メッセージ
+    state.performance.savedMessage = `Saved: ${snapshotCount} snapshots`
     emitter.emit('render')
+    setTimeout(() => {
+      state.performance.savedMessage = null
+      emitter.emit('render')
+    }, 3000)
+
+    // 新しい自動録画バッファを開始
+    startAutoBuffer()
+    console.log('[Performance] New auto-recording started')
   })
 
-  // 記録停止
-  emitter.on('performance: stop recording', () => {
-    if (!state.performance.isRecording) return
-
-    const sessionId = state.performance.currentSessionId
-    const session = storage.getSession(sessionId)
-
-    if (session) {
-      if (session.snapshots.length === 0) {
-        // スナップショットが0件なら削除
-        storage.deleteSession(sessionId)
-        const meta = storage.getMeta()
-        delete meta.sessions[sessionId]
-        if (meta.lastSessionId === sessionId) {
-          meta.lastSessionId = null
-        }
-        storage.saveMeta(meta)
-        state.performance.sessions = meta.sessions
-        console.log(`[Performance] Recording cancelled (no snapshots): ${sessionId}`)
-      } else {
-        // セッションにdurationを保存
-        const duration = Date.now() - state.performance.recordingStartTime
-        session.duration = duration
-        storage.saveSession(session)
-
-        // メタデータを更新
-        const meta = storage.getMeta()
-        if (meta.sessions[sessionId]) {
-          meta.sessions[sessionId].snapshotCount = session.snapshots.length
-          meta.sessions[sessionId].duration = duration
-          storage.saveMeta(meta)
-          state.performance.sessions = meta.sessions
-        }
-        console.log(`[Performance] Recording stopped: ${sessionId}`)
-      }
-    }
-
-    state.performance.isRecording = false
-    state.performance.currentSessionId = null
-    state.performance.recordingStartTime = null
-
-    // YouTube同期停止
-    emitter.emit('youtube: stop sync')
-
-    emitter.emit('render')
-  })
-
-  // 記録トグル
+  // 後方互換: toggle recording → save session
   emitter.on('performance: toggle recording', () => {
-    if (state.performance.isRecording) {
-      emitter.emit('performance: stop recording')
-    } else {
-      emitter.emit('performance: start recording')
-    }
+    emitter.emit('performance: save session')
   })
 
   // スナップショット追加（repl: evalから呼ばれる）
+  // 自動録画バッファに常に記録
   emitter.on('performance: snapshot', (code) => {
-    if (!state.performance.isRecording || !code) return
+    if (!code || !state.performance.autoBufferStartTime) return
 
-    const sessionId = state.performance.currentSessionId
-    const session = storage.getSession(sessionId)
+    const buffer = autoBuffer.get()
+    if (!buffer) return
 
-    if (!session) return
-
-    const timestamp = Date.now() - state.performance.recordingStartTime
+    const timestamp = Date.now() - state.performance.autoBufferStartTime
 
     const snapshot = {
       timestamp,
@@ -275,20 +266,11 @@ export default function performanceStore(state, emitter) {
       }
     }
 
-    session.snapshots.push(snapshot)
+    buffer.snapshots.push(snapshot)
+    autoBuffer.save(buffer)
+    state.performance.snapshotCount = buffer.snapshots.length
 
-    storage.saveSession(session)
-    state.performance.snapshotCount = session.snapshots.length
-
-    // メタデータもリアルタイム更新
-    const meta = storage.getMeta()
-    if (meta.sessions[sessionId]) {
-      meta.sessions[sessionId].snapshotCount = session.snapshots.length
-      meta.sessions[sessionId].duration = Date.now() - state.performance.recordingStartTime
-      storage.saveMeta(meta)
-    }
-
-    console.log(`[Performance] Snapshot added: ${timestamp}ms, total: ${session.snapshots.length}`)
+    console.log(`[Performance] Snapshot added: ${timestamp}ms, total: ${buffer.snapshots.length}`)
   })
 
   // 再生開始
@@ -695,13 +677,8 @@ export default function performanceStore(state, emitter) {
     emitter.emit('render')
   })
 
-  // セッション再開（既存セッションの続きを録画）
+  // セッション再開（既存セッションのスナップショットを自動録画バッファに引き継ぎ）
   emitter.on('performance: resume session', (sessionId) => {
-    if (state.performance.isRecording) {
-      console.warn('[Performance] Already recording')
-      return
-    }
-
     const session = storage.getSession(sessionId)
     if (!session) {
       console.warn(`[Performance] Session not found: ${sessionId}`)
@@ -715,23 +692,32 @@ export default function performanceStore(state, emitter) {
       emitter.emit('repl: eval', lastSnapshot.code)
     }
 
-    // 既存のdurationを考慮してrecordingStartTimeを計算
+    // 既存セッションのスナップショットを自動録画バッファに引き継ぎ
+    const existingDuration = session.duration || 0
+    const now = Date.now()
+
+    const buffer = {
+      id: session.id,
+      name: session.name,
+      createdAt: session.createdAt,
+      snapshots: session.snapshots || [],
+      youtube: session.youtube || null
+    }
+    autoBuffer.save(buffer)
+    state.performance.autoBufferStartTime = now - existingDuration
+    state.performance.snapshotCount = buffer.snapshots.length
+
+    // 元のセッションをメタから削除（保存時に再登録される）
     const meta = storage.getMeta()
-    const existingDuration = meta.sessions[sessionId]?.duration || 0
-
-    state.performance.isRecording = true
-    state.performance.currentSessionId = sessionId
-    state.performance.recordingStartTime = Date.now() - existingDuration
-    state.performance.snapshotCount = session.snapshots?.length || 0
-
-    // メタデータのlastSessionIdを更新
-    meta.lastSessionId = sessionId
+    delete meta.sessions[sessionId]
     storage.saveMeta(meta)
+    storage.deleteSession(sessionId)
+    state.performance.sessions = meta.sessions
 
     // セッションリストを閉じる
     state.performance.showSessionList = false
 
-    console.log(`[Performance] Recording resumed: ${sessionId} (${state.performance.snapshotCount} existing snapshots)`)
+    console.log(`[Performance] Session resumed into auto-buffer: ${sessionId} (${state.performance.snapshotCount} existing snapshots)`)
     emitter.emit('render')
   })
 

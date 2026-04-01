@@ -3,16 +3,16 @@ import html from 'choo/html'
 export default function recordingIndicator(state, emit) {
   const perf = state.performance
 
-  if (!perf?.isRecording && !perf?.isPlaying && !perf?.isPaused) return html``
-
-  if (perf.isRecording) {
+  // 保存確認メッセージ表示
+  if (perf?.savedMessage) {
     return html`
-      <div id="recording-indicator" class="recording">
-        <span class="rec-dot"></span>
-        <span class="count">${perf.snapshotCount}</span>
+      <div id="recording-indicator" class="saved">
+        <span class="saved-message">${perf.savedMessage}</span>
       </div>
     `
   }
+
+  if (!perf?.isPlaying && !perf?.isPaused) return html``
 
   const prevSnapshot = () => emit('performance: prev snapshot')
   const nextSnapshot = () => emit('performance: next snapshot')
