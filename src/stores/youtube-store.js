@@ -6,11 +6,11 @@
 import youtubePlayer from '../lib/youtube-player.js'
 
 /**
- * YouTube URLからVideo IDを抽出
+ * YouTube URLからVideo IDと開始時刻を抽出
  * @param {string} url - YouTube URL または Video ID
- * @returns {string|null} Video ID または null
+ * @returns {{ videoId: string, startTime: number } | null}
  */
-function extractVideoId(url) {
+function parseYouTubeUrl(url) {
   if (!url) return null
 
   const patterns = [
@@ -24,12 +24,51 @@ function extractVideoId(url) {
     /^([a-zA-Z0-9_-]{11})$/
   ]
 
+  let videoId = null
   for (const pattern of patterns) {
     const match = url.match(pattern)
-    if (match) return match[1]
+    if (match) {
+      videoId = match[1]
+      break
+    }
   }
 
-  return null
+  if (!videoId) return null
+
+  // ?t= または &t= パラメータから開始時刻（秒）を抽出
+  const startTime = parseTimeParam(url)
+
+  return { videoId, startTime }
+}
+
+/**
+ * URLからtパラメータを抽出して秒数に変換
+ * 対応形式: t=120, t=120s, t=2m30s, t=1h2m30s
+ * @param {string} url
+ * @returns {number} 開始時刻（秒）、なければ0
+ */
+function parseTimeParam(url) {
+  const match = url.match(/[?&]t=([^&]+)/)
+  if (!match) return 0
+
+  const value = match[1]
+
+  // 純粋な数値（秒）
+  if (/^\d+$/.test(value)) return parseInt(value, 10)
+
+  // "120s" 形式
+  if (/^\d+s$/.test(value)) return parseInt(value, 10)
+
+  // "1h2m30s", "2m30s" などの形式
+  let seconds = 0
+  const h = value.match(/(\d+)h/)
+  const m = value.match(/(\d+)m/)
+  const s = value.match(/(\d+)s/)
+  if (h) seconds += parseInt(h[1], 10) * 3600
+  if (m) seconds += parseInt(m[1], 10) * 60
+  if (s) seconds += parseInt(s[1], 10)
+
+  return seconds
 }
 
 export default function youtubeStore(state, emitter) {
@@ -201,12 +240,13 @@ export default function youtubeStore(state, emitter) {
 
   // YouTube URLを設定して動画を読み込み
   emitter.on('youtube: load video', async (url) => {
-    const videoId = extractVideoId(url)
-    if (!videoId) {
+    const parsed = parseYouTubeUrl(url)
+    if (!parsed) {
       console.warn('[YouTube] Invalid URL:', url)
       return
     }
 
+    const { videoId, startTime } = parsed
     state.youtube.videoId = videoId
     state.youtube.isVisible = true
     state.youtube.showUrlInput = false
@@ -225,13 +265,14 @@ export default function youtubeStore(state, emitter) {
       try {
         await youtubePlayer.init('youtube-player-container', videoId, {
           width: state.youtube.size.width,
-          height: state.youtube.size.height
+          height: state.youtube.size.height,
+          playerVars: startTime > 0 ? { start: startTime } : {}
         })
         state.youtube.isReady = true
 
         youtubePlayer.onStateChange(handleStateChange)
 
-        console.log('[YouTube] Player initialized')
+        console.log(`[YouTube] Player initialized${startTime > 0 ? ` (start: ${startTime}s)` : ''}`)
       } catch (e) {
         console.error('[YouTube] Failed to initialize player:', e)
       }
