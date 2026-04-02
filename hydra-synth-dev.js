@@ -3677,16 +3677,16 @@ var _default = {
       return newArr;
     };
   },
-  getValue: function getValue(arr = []) {
+  getValue: function getValue(arr = [], parentCycle) {
     return ({
       time,
       bpm
     }) => {
       let speed = arr._speed ? arr._speed : 1;
       let smooth = arr._smooth ? arr._smooth : 0;
-      let index = time * speed * (bpm / 60) + (arr._offset || 0);
+      let index = parentCycle !== undefined ? parentCycle * speed + (arr._offset || 0) : time * speed * (bpm / 60) + (arr._offset || 0);
 
-      const resolve = val => Array.isArray(val) ? getValue(val)({
+      const resolve = (val, cycle) => Array.isArray(val) ? getValue(val, cycle)({
         time,
         bpm
       }) : val;
@@ -3696,20 +3696,22 @@ var _default = {
 
         let _index = index - smooth / 2;
 
+        let cycle = Math.floor(Math.max(0, _index) / arr.length);
         let currIndex = Math.floor(_index % arr.length);
         let nextIndex = Math.floor((_index + 1) % arr.length);
-        let currValue = resolve(arr[currIndex]);
-        let nextValue = resolve(arr[nextIndex]); // saw mode: treat last-to-first transition as next cycle's first-to-second
+        let currValue = resolve(arr[currIndex], cycle);
+        let nextValue = resolve(arr[nextIndex], cycle); // saw mode: treat last-to-first transition as next cycle's first-to-second
 
         if (arr._saw && currIndex === arr.length - 1 && nextIndex === 0) {
-          currValue = resolve(arr[0]);
-          nextValue = resolve(arr[1 % arr.length]);
+          currValue = resolve(arr[0], cycle);
+          nextValue = resolve(arr[1 % arr.length], cycle);
         }
 
         let t = Math.min(_index % 1 / smooth, 1);
         return ease(t) * (nextValue - currValue) + currValue;
       } else {
-        return resolve(arr[Math.floor(index % arr.length)]);
+        let cycle = Math.floor(index / arr.length);
+        return resolve(arr[Math.floor(index % arr.length)], cycle);
       }
     };
   }
