@@ -239,6 +239,18 @@ class MidiInput {
   }
 
   _replayEvent(status, d1, d2) {
+    // バッファにも記録（セッション録画がループ再生もキャプチャできるように）
+    // ただし再生中は二重記録を防ぐためスキップ
+    if (!this._isPlayback) {
+      const now = performance.now()
+      this._buffer.push({ t: now, status, d1, d2 })
+      // バッファのtrimming（handleMIDIMessage以外からも肥大化を防ぐ）
+      const cutoff = now - this._bufferMaxMs
+      while (this._buffer.length > 0 && this._buffer[0].t < cutoff) {
+        this._buffer.shift()
+      }
+    }
+
     const command = status >> 4
     switch (command) {
       case 9: // Note On

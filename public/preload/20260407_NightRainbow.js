@@ -167,7 +167,20 @@ _pollLoopLength = () => {
     }
 }
 
+_snapshotPrev = 0
+
 _pollLoop = () => {
+    // 再生中はloop操作をスキップ（MIDI値はスナップショットから再生される）
+    if (midi._isPlayback) return
+
+    // note 26 → MIDI snapshot
+    const snap = midi.note[26] > 0 ? 1 : 0
+    if (snap && !_snapshotPrev) {
+        try { midiSnapshot() } catch (e) { console.warn('[snapshot]', e) }
+        _toast('MIDI snapshot')
+    }
+    _snapshotPrev = snap
+
     _pollLoopLength()
 
     // All-stop on note 27 (SOLO)

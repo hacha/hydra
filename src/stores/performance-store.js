@@ -242,21 +242,40 @@ export default function performanceStore(state, emitter) {
     emitter.emit('performance: save session')
   })
 
-  // スナップショット追加（repl: evalから呼ばれる）
-  // 自動録画バッファに常に記録
-  emitter.on('performance: snapshot', (code) => {
-    if (!code || !state.performance.autoBufferStartTime) return
+  // 前回スナップショット時のperformance.now()を記録（MIDIバッファの切り出しに使用）
+  let lastSnapshotPerfTime = performance.now()
+
+  // スナップショット記録の共通処理
+  // code: 評価コード（nullならMIDIのみのスナップショット）
+  function captureSnapshot(code) {
+    if (!state.performance.autoBufferStartTime) return
 
     const buffer = autoBuffer.get()
     if (!buffer) return
 
     const timestamp = Date.now() - state.performance.autoBufferStartTime
+    const now = performance.now()
+
+    // 前回スナップショット以降のMIDIイベントを切り出す
+    let midiEvents = null
+    if (state.midiInput && state.midiInput._buffer.length > 0) {
+      const since = lastSnapshotPerfTime
+      const events = state.midiInput._buffer
+        .filter(e => e.t > since)
+        .map(e => [Math.round(e.t - since), e.status, e.d1, e.d2]) // [offset, status, d1, d2] 配列で軽量化
+      if (events.length > 0) midiEvents = events
+    }
+    lastSnapshotPerfTime = now
+
+    // MIDIイベントもコードもなければスキップ
+    if (!code && !midiEvents) return
 
     const snapshot = {
       timestamp,
-      code,
       absoluteTime: Date.now()
     }
+    if (code) snapshot.code = code
+    if (midiEvents) snapshot.midi = midiEvents
 
     // YouTube再生位置を追加（YouTubeが読み込まれている場合）
     if (state.youtube?.videoId && state.youtube?.isReady) {
@@ -281,8 +300,22 @@ export default function performanceStore(state, emitter) {
     autoBuffer.save(buffer)
     state.performance.snapshotCount = buffer.snapshots.length
 
-    console.log(`[Performance] Snapshot added: ${timestamp}ms, total: ${buffer.snapshots.length}`)
+    console.log(`[Performance] Snapshot added: ${timestamp}ms, ${code ? 'code' : 'midi'}${midiEvents ? ` (${midiEvents.length} midi events)` : ''}, total: ${buffer.snapshots.length}`)
+  }
+
+  // コード評価時のスナップショット（repl: evalから呼ばれる）
+  emitter.on('performance: snapshot', (code) => {
+    if (!code) return
+    captureSnapshot(code)
   })
+
+  // MIDIのみのスナップショット（明示的呼び出し）
+  emitter.on('performance: midi snapshot', () => {
+    captureSnapshot(null)
+  })
+
+  // グローバル関数として公開
+  window.midiSnapshot = () => emitter.emit('performance: midi snapshot')
 
   // 再生開始
   // startIndex: 開始するスナップショットのインデックス（0から始まる）
@@ -321,8 +354,28 @@ export default function performanceStore(state, emitter) {
     state.performance.playbackSpeed = speed
     state.performance.playbackStartTime = Date.now() - initialSnapshot.timestamp / speed
     state.performance.playbackTotal = session.snapshots.length
-    emitter.emit('editor: load code', initialSnapshot.code)
-    emitter.emit('repl: eval', initialSnapshot.code)
+    // 再生中フラグ（preloadのloop検知を抑制）
+    if (state.midiInput) state.midiInput._isPlayback = true
+
+    // 最初のスナップショットのMIDIイベントを再生
+    if (initialSnapshot.midi) {
+      replayMidiEvents(state.midiInput, initialSnapshot.midi, speed)
+    }
+
+    // コード付きスナップショットを探して適用（MIDIのみスナップショットの場合は遡る）
+    let codeToApply = initialSnapshot.code
+    if (!codeToApply) {
+      for (let i = initialIndex - 1; i >= 0; i--) {
+        if (session.snapshots[i].code) {
+          codeToApply = session.snapshots[i].code
+          break
+        }
+      }
+    }
+    if (codeToApply) {
+      emitter.emit('editor: load code', codeToApply)
+      emitter.emit('repl: eval', codeToApply)
+    }
 
     // YouTube同期再生開始（セッションにYouTube情報がある場合）
     if (session.youtube?.videoId) {
@@ -377,6 +430,8 @@ export default function performanceStore(state, emitter) {
       state.performance.playbackTimerId = null
     }
 
+    clearMidiPlaybackTimers()
+
     if (state.performance.progressIntervalId) {
       clearInterval(state.performance.progressIntervalId)
       state.performance.progressIntervalId = null
@@ -387,6 +442,9 @@ export default function performanceStore(state, emitter) {
     state.performance.playbackSessionId = null
     state.performance.playbackIndex = 0
     state.performance.playbackProgress = 0
+
+    // 再生中フラグ解除
+    if (state.midiInput) state.midiInput._isPlayback = false
 
     // YouTube同期停止
     emitter.emit('youtube: stop sync')
@@ -403,6 +461,8 @@ export default function performanceStore(state, emitter) {
       clearTimeout(state.performance.playbackTimerId)
       state.performance.playbackTimerId = null
     }
+
+    clearMidiPlaybackTimers()
 
     if (state.performance.progressIntervalId) {
       clearInterval(state.performance.progressIntervalId)
@@ -494,9 +554,23 @@ export default function performanceStore(state, emitter) {
 
     const snapshot = session.snapshots[targetIndex]
 
-    // コードを適用
-    emitter.emit('editor: load code', snapshot.code)
-    emitter.emit('repl: eval', snapshot.code)
+    // MIDIイベント再生
+    if (snapshot.midi) {
+      clearMidiPlaybackTimers()
+      replayMidiEvents(state.midiInput, snapshot.midi, state.performance.playbackSpeed)
+    }
+
+    // コードを適用（無ければ直前のコード付きスナップショットを探す）
+    let code = snapshot.code
+    if (!code) {
+      for (let i = targetIndex - 1; i >= 0; i--) {
+        if (session.snapshots[i].code) { code = session.snapshots[i].code; break }
+      }
+    }
+    if (code) {
+      emitter.emit('editor: load code', code)
+      emitter.emit('repl: eval', code)
+    }
 
     // YouTubeシーク
     if (snapshot.youtubeTime !== undefined) {
@@ -540,9 +614,23 @@ export default function performanceStore(state, emitter) {
 
     const snapshot = session.snapshots[targetIndex]
 
-    // コードを適用
-    emitter.emit('editor: load code', snapshot.code)
-    emitter.emit('repl: eval', snapshot.code)
+    // MIDIイベント再生
+    if (snapshot.midi) {
+      clearMidiPlaybackTimers()
+      replayMidiEvents(state.midiInput, snapshot.midi, state.performance.playbackSpeed)
+    }
+
+    // コードを適用（無ければ直前のコード付きスナップショットを探す）
+    let code = snapshot.code
+    if (!code) {
+      for (let i = targetIndex - 1; i >= 0; i--) {
+        if (session.snapshots[i].code) { code = session.snapshots[i].code; break }
+      }
+    }
+    if (code) {
+      emitter.emit('editor: load code', code)
+      emitter.emit('repl: eval', code)
+    }
 
     // YouTubeシーク
     if (snapshot.youtubeTime !== undefined) {
@@ -582,8 +670,23 @@ export default function performanceStore(state, emitter) {
     const index = Math.max(0, Math.min(targetIndex, session.snapshots.length - 1))
     const snapshot = session.snapshots[index]
 
-    emitter.emit('editor: load code', snapshot.code)
-    emitter.emit('repl: eval', snapshot.code)
+    // MIDIイベント再生
+    if (snapshot.midi) {
+      clearMidiPlaybackTimers()
+      replayMidiEvents(state.midiInput, snapshot.midi, state.performance.playbackSpeed)
+    }
+
+    // コードを適用（無ければ直前のコード付きスナップショットを探す）
+    let code = snapshot.code
+    if (!code) {
+      for (let i = index - 1; i >= 0; i--) {
+        if (session.snapshots[i].code) { code = session.snapshots[i].code; break }
+      }
+    }
+    if (code) {
+      emitter.emit('editor: load code', code)
+      emitter.emit('repl: eval', code)
+    }
 
     // YouTubeシーク（YouTube側からのseek時は不要 → 無限ループ防止）
     if (snapshot.youtubeTime !== undefined && !state.performance._seekFromYoutube) {
@@ -880,6 +983,25 @@ export default function performanceStore(state, emitter) {
 }
 
 // 次のスナップショットをスケジュール
+// MIDIイベント再生用タイマーID（停止時にクリアするため保持）
+let midiPlaybackTimers = []
+
+function replayMidiEvents(midi, events, speed) {
+  if (!midi || !events) return
+  for (const evt of events) {
+    const [offset, status, d1, d2] = evt
+    const id = setTimeout(() => {
+      midi._replayEvent(status, d1, d2)
+    }, offset / speed)
+    midiPlaybackTimers.push(id)
+  }
+}
+
+function clearMidiPlaybackTimers() {
+  midiPlaybackTimers.forEach(id => clearTimeout(id))
+  midiPlaybackTimers = []
+}
+
 function scheduleNextSnapshot(session, emitter, state) {
   if (!state.performance.isPlaying) return
 
@@ -894,21 +1016,29 @@ function scheduleNextSnapshot(session, emitter, state) {
 
   const snapshot = session.snapshots[index]
   const prevSnapshot = index > 0 ? session.snapshots[index - 1] : null
-  
+
   // 進捗計算用のtimestamp情報を保存
   state.performance.currentSnapshotTime = prevSnapshot ? prevSnapshot.timestamp : 0
   state.performance.nextSnapshotTime = snapshot.timestamp
-  
+
   const elapsed = Date.now() - state.performance.playbackStartTime
   const targetTime = snapshot.timestamp / state.performance.playbackSpeed
   const delay = Math.max(0, targetTime - elapsed)
 
+  // 次スナップショットのMIDIイベントを先行再生
+  if (snapshot.midi) {
+    clearMidiPlaybackTimers()
+    replayMidiEvents(state.midiInput, snapshot.midi, state.performance.playbackSpeed)
+  }
+
   state.performance.playbackTimerId = setTimeout(() => {
     if (!state.performance.isPlaying) return
 
-    // コードをエディタに設定して実行
-    emitter.emit('editor: load code', snapshot.code)
-    emitter.emit('repl: eval', snapshot.code)
+    // コードがあればエディタに設定して実行
+    if (snapshot.code) {
+      emitter.emit('editor: load code', snapshot.code)
+      emitter.emit('repl: eval', snapshot.code)
+    }
 
     state.performance.playbackIndex++
     scheduleNextSnapshot(session, emitter, state)
