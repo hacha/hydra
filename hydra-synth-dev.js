@@ -3056,6 +3056,8 @@ var _evalSandbox = _interopRequireDefault(require("./eval-sandbox.js"));
 
 var _generatorFactory = _interopRequireDefault(require("./generator-factory.js"));
 
+var _textSource = _interopRequireDefault(require("./text-source.js"));
+
 var _regl = _interopRequireDefault(require("regl"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
@@ -3142,6 +3144,8 @@ class HydraRenderer {
     this._initSources(numSources);
 
     this._generateGlslTransforms();
+
+    this._initTextGenerator();
 
     this.synth.screencap = () => {
       this.saveFrame = true;
@@ -3456,6 +3460,35 @@ class HydraRenderer {
     this.synth.setFunction = this.generator.setFunction.bind(this.generator);
   }
 
+  _initTextGenerator() {
+    var self = this;
+    var srcTransform = this.generator.glslTransforms['src'];
+
+    var textFunc = function (str, fontSize, opts) {
+      if (str === undefined) str = '';
+
+      if (typeof fontSize === 'object') {
+        opts = fontSize;
+        fontSize = undefined;
+      }
+
+      if (opts === undefined) opts = {};
+      if (fontSize !== undefined) opts.fontSize = fontSize;
+      var textSource = new _textSource.default(self.regl, self.width, self.height, str, opts);
+      return new self.generator.sourceClass({
+        name: 'src',
+        transform: srcTransform,
+        userArgs: [textSource],
+        defaultOutput: self.generator.defaultOutput,
+        defaultUniforms: self.generator.defaultUniforms,
+        synth: self.generator
+      });
+    };
+
+    this.synth.text = textFunc;
+    if (this.sandbox) this.sandbox.add('text');
+  }
+
   _render(output) {
     if (output) {
       this.output = output;
@@ -3530,7 +3563,7 @@ class HydraRenderer {
 var _default = HydraRenderer;
 exports.default = _default;
 
-},{"./eval-sandbox.js":10,"./generator-factory.js":13,"./hydra-source.js":17,"./lib/array-utils.js":20,"./lib/audio.js":21,"./lib/mouse.js":24,"./lib/video-recorder.js":27,"./output.js":29,"raf-loop":6,"regl":8}],19:[function(require,module,exports){
+},{"./eval-sandbox.js":10,"./generator-factory.js":13,"./hydra-source.js":17,"./lib/array-utils.js":20,"./lib/audio.js":21,"./lib/mouse.js":24,"./lib/video-recorder.js":27,"./output.js":29,"./text-source.js":30,"raf-loop":6,"regl":8}],19:[function(require,module,exports){
 "use strict";
 
 var _hydraSynth = _interopRequireDefault(require("./hydra-synth.js"));
@@ -4625,6 +4658,69 @@ Output.prototype.tick = function (props) {
 };
 
 var _default = Output;
+exports.default = _default;
+
+},{}],30:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+class TextSource {
+  constructor(regl, width, height, str, opts = {}) {
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = width;
+    this.canvas.height = height;
+    this.ctx = this.canvas.getContext('2d');
+    this.tex = regl.texture(this.canvas);
+    this.str = str;
+    this.opts = opts;
+    this._isDynamic = typeof str === 'function';
+    this._lastStr = null;
+
+    this._draw(this._isDynamic ? str() : str);
+  }
+
+  _draw(str) {
+    if (str === this._lastStr) return;
+    this._lastStr = str;
+    const ctx = this.ctx;
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    const opts = this.opts;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = opts.bg !== undefined ? opts.bg : 'black';
+    ctx.fillRect(0, 0, w, h);
+    const fontSize = opts.fontSize || Math.floor(h / 8);
+    ctx.font = opts.font || `${fontSize}px system-ui`;
+    ctx.fillStyle = opts.color || 'white';
+    ctx.textAlign = opts.align || 'center';
+    ctx.textBaseline = opts.baseline || 'middle';
+    const lines = String(str).split('\n');
+    const lineHeight = opts.lineHeight || fontSize * 1.2;
+    const totalHeight = lineHeight * (lines.length - 1);
+    const startY = h / 2 - totalHeight / 2;
+
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], w / 2, startY + i * lineHeight);
+    }
+
+    this.tex.subimage(this.canvas);
+  }
+
+  getTexture() {
+    if (this._isDynamic) {
+      this._draw(this.str());
+    }
+
+    return this.tex;
+  }
+
+}
+
+var _default = TextSource;
 exports.default = _default;
 
 },{}]},{},[19])(19)
