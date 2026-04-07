@@ -1,12 +1,38 @@
 import Gallery from './gallery.js'
 let sketches
 
+async function fetchAndEval(path) {
+  const base = path.startsWith('/') ? path : `/preload/${path}`
+  const res = await fetch(base)
+  if (!res.ok) throw new Error(`Failed to load script: ${base} (${res.status})`)
+  const code = await res.text()
+  // window.evalで実行することでHydraのグローバルスコープ(osc, s0等)にアクセス可能
+  await window.eval(`(async() => {\n${code}\n})()`)
+}
+
+// preloadファイルからさらにスクリプトを読み込むためのヘルパー
+window.loadScript = fetchAndEval
+
+async function runPreload(emitter) {
+  const preload = new URLSearchParams(window.location.search).get('preload')
+  if (!preload) return
+  try {
+    console.log(`[preload] loading /preload/${preload}`)
+    await fetchAndEval(preload)
+    console.log('[preload] done')
+  } catch (err) {
+    console.error('[preload] error:', err)
+    emitter.emit('render')
+  }
+}
+
 export default function galleryStore(state, emitter) {
     emitter.on('DOMContentLoaded', function () {
-   
+
         sketches = new Gallery((code, sketchFromURL) => {
           // Check if hydra-strudel is ready before evaluating code
-          const evalCode = () => {
+          const evalCode = async () => {
+            await runPreload(emitter)
             emitter.emit('load and eval code', code, false)
             if(sketchFromURL) {
               emitter.emit('ui: hide info')
