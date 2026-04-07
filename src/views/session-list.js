@@ -114,7 +114,7 @@ export default function sessionList(state, emit) {
                   <div class="session-meta">
                     ${formatDate(session.createdAt)} ·
                     ${session.snapshotCount || 0} snapshots ·
-                    ${formatDuration(session.duration)}
+                    ${formatDuration(session.duration)}${session.preload ? ` · 🎛 ${session.preload}` : ''}
                   </div>
                   <div class="session-id">${session.id}</div>
                 </div>

@@ -133,11 +133,13 @@ export default function performanceStore(state, emitter) {
   function startAutoBuffer() {
     autoBuffer.clear()
     const now = Date.now()
+    const preload = new URLSearchParams(window.location.search).get('preload') || null
     const buffer = {
       id: generateUUID(),
       name: `Session ${formatDateTime(now)}`,
       createdAt: now,
       snapshots: [],
+      preload,
       youtube: state.youtube?.videoId ? {
         videoId: state.youtube.videoId,
         startTime: 0
@@ -212,7 +214,8 @@ export default function performanceStore(state, emitter) {
       name: buffer.name,
       createdAt: buffer.createdAt,
       snapshotCount: buffer.snapshots.length,
-      duration: buffer.duration
+      duration: buffer.duration,
+      preload: buffer.preload || null
     }
     meta.lastSessionId = buffer.id
     storage.saveMeta(meta)
@@ -283,7 +286,7 @@ export default function performanceStore(state, emitter) {
 
   // 再生開始
   // startIndex: 開始するスナップショットのインデックス（0から始まる）
-  emitter.on('performance: start playback', (sessionId, startIndex = 0, speed = 1.0) => {
+  emitter.on('performance: start playback', async (sessionId, startIndex = 0, speed = 1.0) => {
     if (state.performance.isPlaying) {
       emitter.emit('performance: stop playback')
     }
@@ -297,6 +300,21 @@ export default function performanceStore(state, emitter) {
     // startIndexを有効範囲内に収める
     const initialIndex = Math.max(0, Math.min(startIndex, session.snapshots.length - 1))
     const initialSnapshot = session.snapshots[initialIndex]
+
+    // セッションにpreload情報があればロード（完了を待つ）
+    if (session.preload) {
+      console.log(`[Performance] Loading preload: ${session.preload}`)
+      try {
+        const base = session.preload.startsWith('/') ? session.preload : `/preload/${session.preload}`
+        const res = await fetch(base)
+        if (!res.ok) throw new Error(`${res.status}`)
+        const code = await res.text()
+        await window.eval(`(async() => {\n${code}\n})()`)
+        console.log(`[Performance] Preload loaded: ${session.preload}`)
+      } catch (err) {
+        console.warn(`[Performance] Failed to load preload: ${session.preload}`, err)
+      }
+    }
 
     state.performance.isPlaying = true
     state.performance.playbackSessionId = sessionId
