@@ -338,7 +338,9 @@ export default function performanceStore(state, emitter) {
     if (session.preload) {
       console.log(`[Performance] Loading preload: ${session.preload}`)
       try {
-        const base = session.preload.startsWith('/') ? session.preload : `/preload/${session.preload}`
+        let preloadPath = session.preload
+        if (!preloadPath.startsWith('/') && !preloadPath.includes('.')) preloadPath += '.js'
+        const base = preloadPath.startsWith('/') ? preloadPath : `/preload/${preloadPath}`
         const res = await fetch(base)
         if (!res.ok) throw new Error(`${res.status}`)
         const code = await res.text()

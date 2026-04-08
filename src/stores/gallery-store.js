@@ -2,6 +2,7 @@ import Gallery from './gallery.js'
 let sketches
 
 async function fetchAndEval(path) {
+  if (!path.startsWith('/') && !path.includes('.')) path += '.js'
   const base = path.startsWith('/') ? path : `/preload/${path}`
   const res = await fetch(base)
   if (!res.ok) throw new Error(`Failed to load script: ${base} (${res.status})`)
