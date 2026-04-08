@@ -111,13 +111,15 @@ _toastTimer = null
 _toast = (msg, ms = 1500) => {
     if (!_toastEl) {
         _toastEl = document.createElement('div')
+        _toastEl.id = '_midi-toast'
         Object.assign(_toastEl.style, {
             position: 'fixed', bottom: '28px', left: '10px', zIndex: 10,
             color: 'rgba(255,255,255,.8)', fontFamily: 'monospace', fontSize: '10px',
             pointerEvents: 'none', transition: 'opacity 0.3s', opacity: '0'
         })
-        document.body.appendChild(_toastEl)
     }
+    // chooのre-renderでDOMから外れた場合に再追加
+    if (!_toastEl.parentNode) document.body.appendChild(_toastEl)
     _toastEl.textContent = msg
     _toastEl.style.opacity = '0.8'
     clearTimeout(_toastTimer)
