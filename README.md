@@ -101,10 +101,10 @@ URLパラメータでセットアップスクリプトを自動読み込みで�
 
 **同梱プリロード:**
 - `example.js` - 基本的なMIDIヘルパー関数
-- `20260407_NightRainbow.js` - AKAI MidiMix用プリセット（後述）
+- `20260407_NightRainbow.js` - NightRainbowイベント用セットアップ（AKAI MidiMixマッピング+ループ機能）
 
-#### AKAI MidiMix プリセット
-`?preload=20260407_NightRainbow` で読み込み。MidiMixの全コントロールをHydra用にマッピングします。
+#### 20260407\_NightRainbow.js
+`?preload=20260407_NightRainbow` で読み込み。NightRainbowイベント向けの仕込みスクリプト。AKAI MidiMixのマッピングとループ機能を含む。汎用MidiMixプリセットは今後別途切り出す可能性あり。
 
 **ノブ・フェーダー（getter）:**
 - `knob11`〜`knob83` - 8列×3行のノブ値（0.0〜1.0）

@@ -105,10 +105,15 @@ for (let i = 1; i <= 8; i++) {
     window[`btnR${i}Up`] = (decay, amount) => btnRecUp(i, decay, amount)
 }
 
-// --- Toast (左下に一時表示) ---
+// --- UI (toast + loop indicator, opt-in) ---
+_midiUIEnabled = false
+showMidiUI = () => { _midiUIEnabled = true }
+hideMidiUI = () => { _midiUIEnabled = false }
+
 _toastEl = null
 _toastTimer = null
 _toast = (msg, ms = 1500) => {
+    if (!_midiUIEnabled) return
     if (!_toastEl) {
         _toastEl = document.createElement('div')
         _toastEl.id = '_midi-toast'
@@ -118,7 +123,6 @@ _toast = (msg, ms = 1500) => {
             pointerEvents: 'none', transition: 'opacity 0.3s', opacity: '0'
         })
     }
-    // chooのre-renderでDOMから外れた場合に再追加
     if (!_toastEl.parentNode) document.body.appendChild(_toastEl)
     _toastEl.textContent = msg
     _toastEl.style.opacity = '0.8'
@@ -164,10 +168,10 @@ _initLoopIndicator = () => {
         _loopIndicatorEl.appendChild(svg)
     }
 }
-_initLoopIndicator()
 
 _updateLoopIndicator = () => {
-    if (!_loopIndicatorEl) return
+    if (!_midiUIEnabled) return
+    if (!_loopIndicatorEl) _initLoopIndicator()
     if (!_loopIndicatorEl.parentNode) document.body.appendChild(_loopIndicatorEl)
     const now = performance.now()
     for (let i = 0; i < _loopChCount; i++) {
@@ -286,6 +290,8 @@ _pollLoop = () => {
     }
 }
 
-;(function _loopRAF() { _pollLoop(); requestAnimationFrame(_loopRAF) })()
+    ; (function _loopRAF() { _pollLoop(); requestAnimationFrame(_loopRAF) })()
 
 console.log('[preload] AKAI MidiMix: btnR1-4=loop, btnR5-8=toggle, knob*3(1-4)=loop length, note26=snapshot, SOLO=all stop')
+
+showMidiUI()
