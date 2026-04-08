@@ -196,8 +196,7 @@ class MidiInput {
         durationMs = saved.durationMs
         console.log(`midi.loop(${id}): re-trigger (${events.length} events, ${Math.round(durationMs)}ms)`)
       } else {
-        console.warn(`midi.loop(${id}): no events in buffer`)
-        return
+        console.log(`midi.loop(${id}): empty loop (${Math.round(durationMs)}ms)`)
       }
     } else {
       console.log(`midi.loop(${id}): ${bars} bar(s) @ ${effectiveBpm} BPM → ${Math.round(durationMs)}ms, ${events.length} events`)
@@ -209,9 +208,9 @@ class MidiInput {
     if (quantize && this._tapTempo && this._tapTempo.lastTap) {
       const anchor = this._tapTempo.lastTap
       const elapsed = Date.now() - anchor
-      const timeIntoBar = ((elapsed % barMs) + barMs) % barMs
-      let delay = barMs - timeIntoBar
-      if (delay < 50) delay += barMs
+      const timeIntoBeat = ((elapsed % beatMs) + beatMs) % beatMs
+      let delay = beatMs - timeIntoBeat
+      if (delay < 50) delay += beatMs
       console.log(`midi.loop(${id}): quantize wait ${Math.round(delay)}ms`)
       loop.quantizeTimer = setTimeout(() => {
         loop.quantizeTimer = null
@@ -223,6 +222,7 @@ class MidiInput {
   }
 
   _startLoop(loop) {
+    loop.startTime = performance.now()
     this._runCycle(loop)
     loop.interval = setInterval(() => this._runCycle(loop), loop.durationMs)
   }
