@@ -10,10 +10,12 @@
 //     btnM1(decay)      → 1.0→0.0 over decay ms on press
 //     btnM1(decay, amt) → amt→0.0
 //     btnM1Up(decay)    → trigger on release
-//   btnR1..8 (Rec) — per-channel loop toggle:
+//   btnR1..4 (Rec) — per-channel loop toggle:
 //     btnR押下 → そのカラムのknob*1,*2 / fader / btnMをクオンタイズループ
 //     再押下 → そのチャンネルのループ停止
-//   knob*3 (row3) — loop length: 1/2/4/8/16/32 bars
+//   btnR5..8 (Rec) — plain toggle (0/1, decay対応)
+//   knob*3 (row3, ch1-4) — loop length: 1/2/4/8 bars
+//   note 26 — MIDIスナップショット記録
 //   SOLO (note 27) — 全ループ停止
 //
 // Example:
@@ -123,44 +125,42 @@ _toast = (msg, ms = 1500) => {
 }
 
 // --- MIDI Looper (per-channel, quantized) ---
-// btnR1..8: toggle ON → loop that column's knobs/fader/mute, OFF → stop
-// knob*3 (row 3): loop length selector — 1/2/4/8/16/32 bars
-// SOLO (note 27): all-stop
-//
-// Column N records: knobN1 (row1 CC), knobN2 (row2 CC), btnMN (mute note), faderN (CC)
-// knobN3 (row3 CC) is NOT recorded — it controls loop length
+// btnR1..4: loop toggle (per-column knobs/fader/mute)
+// btnR5..8: plain toggle (original behavior, usable in Hydra code)
+// knob*3 (row 3, ch1-4): loop length selector — 1/2/4/8 bars
+// note 26: MIDI snapshot, note 27 (SOLO): all-loop stop
 
+_loopChCount = 4 // ch1-4 only
 _loopBarChoices = [1, 2, 4, 8]
-_loopExcludeNotes = [..._recNotes, 27] // Rec buttons + SOLO never looped
+_loopExcludeNotes = [..._recNotes, 26, 27] // Rec buttons + snapshot + SOLO never looped
 
-// Per-column config: { includeCCs, includeNotes, lengthCC }
+// Per-column config (ch1-4 only)
 _loopCols = []
-for (let i = 0; i < 8; i++) {
+for (let i = 0; i < _loopChCount; i++) {
     _loopCols.push({
-        includeCCs: [_knobCC[0][i], _knobCC[1][i], _faderCC[i]], // knob row1, row2, fader
-        includeNotes: [_muteNotes[i]],                            // mute button
-        lengthCC: _knobCC[2][i]                                   // knob row3 = length selector
+        includeCCs: [_knobCC[0][i], _knobCC[1][i], _faderCC[i]],
+        includeNotes: [_muteNotes[i]],
+        lengthCC: _knobCC[2][i]
     })
 }
 
 _loopPrevToggle = new Array(128).fill(0)
 _loopKillPrev = 0
-
-_loopLastBars = new Array(8).fill(-1) // track per-column to detect change
+_loopLastBars = new Array(_loopChCount).fill(-1)
 
 _getLoopBars = (col) => {
     const cc = _loopCols[col].lengthCC
-    const val = midi.cc[cc] // 0-1
+    const val = midi.cc[cc]
     const idx = Math.min(Math.floor(val * _loopBarChoices.length), _loopBarChoices.length - 1)
     return _loopBarChoices[idx]
 }
 
 _pollLoopLength = () => {
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < _loopChCount; i++) {
         const bars = _getLoopBars(i)
         if (bars !== _loopLastBars[i]) {
             _loopLastBars[i] = bars
-            if (midi.cc[_loopCols[i].lengthCC] > 0) { // only show after knob is touched
+            if (midi.cc[_loopCols[i].lengthCC] > 0) {
                 _toast(`ch${i + 1} loop: ${bars} bar`)
             }
         }
@@ -170,7 +170,6 @@ _pollLoopLength = () => {
 _snapshotPrev = 0
 
 _pollLoop = () => {
-    // 再生中はloop操作をスキップ（MIDI値はスナップショットから再生される）
     if (midi._isPlayback) return
 
     // note 26 → MIDI snapshot
@@ -187,7 +186,8 @@ _pollLoop = () => {
     const kill = midi.note[27] > 0 ? 1 : 0
     if (kill && !_loopKillPrev) {
         midi.stopLoop()
-        for (const n of _recNotes) {
+        for (let i = 0; i < _loopChCount; i++) {
+            const n = _recNotes[i]
             _toggleState[n] = 0
             _loopPrevToggle[n] = 0
         }
@@ -195,7 +195,8 @@ _pollLoop = () => {
     }
     _loopKillPrev = kill
 
-    for (let i = 0; i < 8; i++) {
+    // btnR1..4 → loop toggle
+    for (let i = 0; i < _loopChCount; i++) {
         const n = _recNotes[i]
         _pollBtn(n)
         const curr = _toggleState[n]
@@ -218,9 +219,13 @@ _pollLoop = () => {
             }
         }
     }
+
+    // btnR5..8 → just poll toggle state (no loop, available via btnR5() etc.)
+    for (let i = _loopChCount; i < 8; i++) {
+        _pollBtn(_recNotes[i])
+    }
 }
 
-    // Poll loop toggles every frame
-    ; (function _loopRAF() { _pollLoop(); requestAnimationFrame(_loopRAF) })()
+;(function _loopRAF() { _pollLoop(); requestAnimationFrame(_loopRAF) })()
 
-console.log('[preload] AKAI MidiMix: knob*3=loop length (1/2/4/8/16/32 bar), btnR1..8=per-channel loop (quantized), SOLO=all stop')
+console.log('[preload] AKAI MidiMix: btnR1-4=loop, btnR5-8=toggle, knob*3(1-4)=loop length, note26=snapshot, SOLO=all stop')
