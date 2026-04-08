@@ -197,6 +197,7 @@ _updateLoopIndicator = () => {
 // note 26: MIDI snapshot, note 27 (SOLO): all-loop stop
 
 _loopBarChoices = [1, 2, 4, 8]
+_loopMaxBars = Math.max(..._loopBarChoices) // always capture this much
 _loopExcludeNotes = [..._recNotes, 26, 27] // Rec buttons + snapshot + SOLO never looped
 
 // Per-column config (ch1-4 only)
@@ -257,7 +258,8 @@ _pollLoop = () => {
                 const col = _loopCols[i]
                 const bars = _getLoopBars(i)
                 midi.loop(`ch${i + 1}`, {
-                    bars,
+                    bars: _loopMaxBars,
+                    playBars: bars,
                     includeCCs: col.includeCCs,
                     includeNotes: col.includeNotes,
                     excludeNotes: _loopExcludeNotes,
@@ -266,6 +268,15 @@ _pollLoop = () => {
             } else {
                 midi.stopLoop(`ch${i + 1}`)
             }
+        }
+
+        // ループ中にknobでlength変更 → 即反映
+        const loop = midi._loops && midi._loops.get(`ch${i + 1}`)
+        if (loop && loop.startTime) {
+            const bars = _getLoopBars(i)
+            const bpm = (midi._tapTempo && midi._tapTempo.bpm) || 120
+            const barMs = (60000 / bpm) * 4
+            midi.setLoopLength(`ch${i + 1}`, barMs * bars)
         }
     }
 

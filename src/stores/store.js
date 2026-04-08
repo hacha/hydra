@@ -148,6 +148,7 @@ class MidiInput {
   loop(id, opts = {}) {
     const {
       bars = 1,
+      playBars = null,      // actual loop length in bars (null = same as bars)
       beatsPerBar = 4,
       bpm = null,
       includeCCs = null,    // array of CC numbers to include (null = all)
@@ -161,14 +162,15 @@ class MidiInput {
     const effectiveBpm = bpm || (this._tapTempo && this._tapTempo.bpm) || 120
     const beatMs = 60000 / effectiveBpm
     const barMs = beatMs * beatsPerBar
-    let durationMs = barMs * bars
+    const captureDurationMs = barMs * bars
+    let durationMs = barMs * (playBars || bars)
 
     const ccSet = includeCCs ? new Set(includeCCs) : null
     const noteSet = includeNotes ? new Set(includeNotes) : null
     const excludeSet = excludeNotes ? new Set(excludeNotes) : null
 
     const now = performance.now()
-    const windowStart = now - durationMs
+    const windowStart = now - captureDurationMs
     let events = this._buffer
       .filter(e => {
         if (e.t < windowStart) return false
@@ -189,20 +191,36 @@ class MidiInput {
         d2: e.d2
       }))
 
+    let fullEvents = events
+    let fullDurationMs = captureDurationMs
     if (events.length === 0) {
       const saved = this._lastLoops.get(id)
       if (saved) {
-        events = saved.events
-        durationMs = saved.durationMs
-        console.log(`midi.loop(${id}): re-trigger (${events.length} events, ${Math.round(durationMs)}ms)`)
+        fullEvents = saved.fullEvents || saved.events
+        fullDurationMs = saved.fullDurationMs || saved.durationMs
+        console.log(`midi.loop(${id}): re-trigger (${fullEvents.length} events, ${Math.round(fullDurationMs)}ms)`)
       } else {
         console.log(`midi.loop(${id}): empty loop (${Math.round(durationMs)}ms)`)
       }
     } else {
-      console.log(`midi.loop(${id}): ${bars} bar(s) @ ${effectiveBpm} BPM → ${Math.round(durationMs)}ms, ${events.length} events`)
+      console.log(`midi.loop(${id}): capture ${bars} bar(s), play ${playBars || bars} bar(s) @ ${effectiveBpm} BPM, ${events.length} events`)
     }
 
-    const loop = { events, durationMs, timers: [], interval: null, quantizeTimer: null }
+    // Trim fullEvents to playback duration (tail portion)
+    const trimOffset = fullDurationMs - durationMs
+    if (trimOffset > 0 && fullEvents.length > 0) {
+      events = fullEvents
+        .filter(e => e.offset >= trimOffset)
+        .map(e => ({ ...e, offset: e.offset - trimOffset }))
+    } else {
+      events = fullEvents
+    }
+
+    const loop = {
+      fullEvents, fullDurationMs,
+      events, durationMs,
+      timers: [], interval: null, quantizeTimer: null
+    }
     this._loops.set(id, loop)
 
     if (quantize && this._tapTempo && this._tapTempo.lastTap) {
@@ -279,6 +297,30 @@ class MidiInput {
     }
   }
 
+  // Change loop length on a running loop (uses tail of fullEvents)
+  setLoopLength(id, newDurationMs) {
+    const loop = this._loops.get(id)
+    if (!loop || !loop.fullEvents) return
+    if (!loop.startTime) return // quantize待ち中は触らない
+    if (Math.abs(loop.durationMs - newDurationMs) < 1) return // no change
+
+    // Take the tail portion of fullEvents
+    const offset = loop.fullDurationMs - newDurationMs
+    if (offset >= 0) {
+      loop.events = loop.fullEvents
+        .filter(e => e.offset >= offset)
+        .map(e => ({ ...e, offset: e.offset - offset }))
+    } else {
+      loop.events = loop.fullEvents.map(e => ({ ...e, offset: e.offset - offset }))
+    }
+    loop.durationMs = newDurationMs
+
+    // Restart cycle with new timing
+    loop.timers.forEach(t => clearTimeout(t))
+    if (loop.interval) clearInterval(loop.interval)
+    this._startLoop(loop)
+  }
+
   // Stop a specific loop track, or all if no id
   stopLoop(id) {
     if (id === undefined) {
@@ -290,8 +332,13 @@ class MidiInput {
     if (loop.quantizeTimer) clearTimeout(loop.quantizeTimer)
     loop.timers.forEach(t => clearTimeout(t))
     if (loop.interval) clearInterval(loop.interval)
-    // Save for re-trigger
-    if (loop.events && loop.events.length > 0) {
+    // Save for re-trigger (full capture preserved)
+    if (loop.fullEvents && loop.fullEvents.length > 0) {
+      this._lastLoops.set(id, {
+        events: loop.events, durationMs: loop.durationMs,
+        fullEvents: loop.fullEvents, fullDurationMs: loop.fullDurationMs
+      })
+    } else if (loop.events && loop.events.length > 0) {
       this._lastLoops.set(id, { events: loop.events, durationMs: loop.durationMs })
     }
     this._loops.delete(id)
