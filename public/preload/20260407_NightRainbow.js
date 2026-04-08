@@ -126,13 +126,76 @@ _toast = (msg, ms = 1500) => {
     _toastTimer = setTimeout(() => { _toastEl.style.opacity = '0' }, ms)
 }
 
+_loopChCount = 4 // ch1-4 only
+
+// --- Loop Indicator (円形プログレス) ---
+_loopIndicatorEl = null
+_loopIndicatorSvgs = []
+
+_initLoopIndicator = () => {
+    _loopIndicatorEl = document.createElement('div')
+    _loopIndicatorEl.id = '_loop-indicator'
+    Object.assign(_loopIndicatorEl.style, {
+        position: 'fixed', bottom: '44px', left: '10px', zIndex: 10,
+        display: 'flex', gap: '4px', pointerEvents: 'none'
+    })
+    const r = 9, stroke = 2, size = (r + stroke) * 2
+    const circumference = 2 * Math.PI * r
+    for (let i = 0; i < _loopChCount; i++) {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+        svg.setAttribute('width', size)
+        svg.setAttribute('height', size)
+        svg.innerHTML = `
+            <circle cx="${r + stroke}" cy="${r + stroke}" r="${r}"
+                fill="none" stroke="rgba(255,255,255,.1)" stroke-width="${stroke}"/>
+            <circle cx="${r + stroke}" cy="${r + stroke}" r="${r}"
+                fill="none" stroke="rgba(255,255,255,.1)" stroke-width="${stroke}"
+                stroke-dasharray="${circumference}" stroke-dashoffset="${circumference}"
+                stroke-linecap="round" transform="rotate(-90 ${r + stroke} ${r + stroke})"/>
+            <text x="${r + stroke}" y="${r + stroke}" text-anchor="middle" dominant-baseline="central"
+                fill="rgba(255,255,255,.2)" font-family="monospace" font-size="7"></text>
+        `
+        _loopIndicatorSvgs.push({
+            el: svg,
+            progress: svg.querySelectorAll('circle')[1],
+            text: svg.querySelector('text'),
+            circumference
+        })
+        _loopIndicatorEl.appendChild(svg)
+    }
+}
+_initLoopIndicator()
+
+_updateLoopIndicator = () => {
+    if (!_loopIndicatorEl) return
+    if (!_loopIndicatorEl.parentNode) document.body.appendChild(_loopIndicatorEl)
+    const now = performance.now()
+    for (let i = 0; i < _loopChCount; i++) {
+        const loop = midi._loops && midi._loops.get(`ch${i + 1}`)
+        const ind = _loopIndicatorSvgs[i]
+        const bars = _getLoopBars(i)
+        ind.text.textContent = bars
+        if (loop && loop.startTime) {
+            const elapsed = (now - loop.startTime) % loop.durationMs
+            const ratio = elapsed / loop.durationMs
+            ind.progress.setAttribute('stroke-dashoffset',
+                ind.circumference * (1 - ratio))
+            ind.progress.setAttribute('stroke', 'rgba(255,255,255,.7)')
+            ind.text.setAttribute('fill', 'rgba(255,255,255,.8)')
+        } else {
+            ind.progress.setAttribute('stroke-dashoffset', ind.circumference)
+            ind.progress.setAttribute('stroke', 'rgba(255,255,255,.1)')
+            ind.text.setAttribute('fill', 'rgba(255,255,255,.25)')
+        }
+    }
+}
+
 // --- MIDI Looper (per-channel, quantized) ---
 // btnR1..4: loop toggle (per-column knobs/fader/mute)
 // btnR5..8: plain toggle (original behavior, usable in Hydra code)
 // knob*3 (row 3, ch1-4): loop length selector — 1/2/4/8 bars
 // note 26: MIDI snapshot, note 27 (SOLO): all-loop stop
 
-_loopChCount = 4 // ch1-4 only
 _loopBarChoices = [1, 2, 4, 8]
 _loopExcludeNotes = [..._recNotes, 26, 27] // Rec buttons + snapshot + SOLO never looped
 
@@ -148,7 +211,6 @@ for (let i = 0; i < _loopChCount; i++) {
 
 _loopPrevToggle = new Array(128).fill(0)
 _loopKillPrev = 0
-_loopLastBars = new Array(_loopChCount).fill(-1)
 
 _getLoopBars = (col) => {
     const cc = _loopCols[col].lengthCC
@@ -157,21 +219,11 @@ _getLoopBars = (col) => {
     return _loopBarChoices[idx]
 }
 
-_pollLoopLength = () => {
-    for (let i = 0; i < _loopChCount; i++) {
-        const bars = _getLoopBars(i)
-        if (bars !== _loopLastBars[i]) {
-            _loopLastBars[i] = bars
-            if (midi.cc[_loopCols[i].lengthCC] > 0) {
-                _toast(`ch${i + 1} loop: ${bars} bar`)
-            }
-        }
-    }
-}
-
 _snapshotPrev = 0
 
 _pollLoop = () => {
+    _updateLoopIndicator()
+
     if (midi._isPlayback) return
 
     // note 26 → MIDI snapshot
@@ -182,8 +234,6 @@ _pollLoop = () => {
     }
     _snapshotPrev = snap
 
-    _pollLoopLength()
-
     // All-stop on note 27 (SOLO)
     const kill = midi.note[27] > 0 ? 1 : 0
     if (kill && !_loopKillPrev) {
@@ -193,7 +243,6 @@ _pollLoop = () => {
             _toggleState[n] = 0
             _loopPrevToggle[n] = 0
         }
-        _toast('LOOP ALL STOP')
     }
     _loopKillPrev = kill
 
@@ -214,10 +263,8 @@ _pollLoop = () => {
                     excludeNotes: _loopExcludeNotes,
                     quantize: true
                 })
-                _toast(`ch${i + 1} LOOP ${bars} bar`)
             } else {
                 midi.stopLoop(`ch${i + 1}`)
-                _toast(`ch${i + 1} STOP`)
             }
         }
     }
