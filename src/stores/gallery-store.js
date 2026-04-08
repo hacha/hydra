@@ -14,10 +14,24 @@ async function fetchAndEval(path) {
 // preloadファイルからさらにスクリプトを読み込むためのヘルパー
 window.loadScript = fetchAndEval
 
+function waitForHydraStrudel(timeoutMs = 3000) {
+  if (window._hydraStrudelReady) return Promise.resolve()
+  return new Promise((resolve) => {
+    window.addEventListener('hydra-strudel-ready', resolve, { once: true })
+    setTimeout(() => {
+      if (!window._hydraStrudelReady) {
+        console.warn('hydra-strudel initialization timeout, proceeding with preload')
+      }
+      resolve()
+    }, timeoutMs)
+  })
+}
+
 async function runPreload(emitter) {
   const preload = new URLSearchParams(window.location.search).get('preload')
   if (!preload) return
   try {
+    await waitForHydraStrudel()
     console.log(`[preload] loading /preload/${preload}`)
     await fetchAndEval(preload)
     console.log('[preload] done')
