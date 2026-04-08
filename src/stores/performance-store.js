@@ -303,6 +303,11 @@ export default function performanceStore(state, emitter) {
     console.log(`[Performance] Snapshot added: ${timestamp}ms, ${code ? 'code' : 'midi'}${midiEvents ? ` (${midiEvents.length} midi events)` : ''}, total: ${buffer.snapshots.length}`)
   }
 
+  // MIDIデータのロスト防止: リングバッファ(60s)が溢れる前に自動スナップショット
+  setInterval(() => {
+    captureSnapshot(null)
+  }, 50000)
+
   // コード評価時のスナップショット（repl: evalから呼ばれる）
   emitter.on('performance: snapshot', (code) => {
     if (!code) return
