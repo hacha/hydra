@@ -836,20 +836,14 @@ export default function performanceStore(state, emitter) {
 
   // セッション再開（既存セッションのスナップショットを自動録画バッファに引き継ぎ）
   emitter.on('performance: resume session', (sessionId) => {
+    state.performance._resumedSessionId = sessionId
     const session = storage.getSession(sessionId)
     if (!session) {
       console.warn(`[Performance] Session not found: ${sessionId}`)
       return
     }
 
-    // 最新のスナップショットのコードをエディタに読み込み・実行
-    if (session.snapshots && session.snapshots.length > 0) {
-      const lastSnapshot = session.snapshots[session.snapshots.length - 1]
-      emitter.emit('editor: load code', lastSnapshot.code)
-      emitter.emit('repl: eval', lastSnapshot.code)
-    }
-
-    // 既存セッションのスナップショットを自動録画バッファに引き継ぎ
+    // 既存セッションのスナップショットを自動録画バッファに引き継ぎ（eval前に行う）
     const existingDuration = session.duration || 0
     const now = Date.now()
 
@@ -863,13 +857,16 @@ export default function performanceStore(state, emitter) {
     autoBuffer.save(buffer)
     state.performance.autoBufferStartTime = now - existingDuration
     state.performance.snapshotCount = buffer.snapshots.length
+    delete state.performance._pendingCodeCheck
 
-    // 元のセッションをメタから削除（保存時に再登録される）
-    const meta = storage.getMeta()
-    delete meta.sessions[sessionId]
-    storage.saveMeta(meta)
-    storage.deleteSession(sessionId)
-    state.performance.sessions = meta.sessions
+    // 最新のコード付きスナップショットをエディタに読み込み・実行
+    const lastCodeSnapshot = session.snapshots?.findLast(s => s.code)
+    if (lastCodeSnapshot) {
+      emitter.emit('editor: load code', lastCodeSnapshot.code)
+      emitter.emit('repl: eval', lastCodeSnapshot.code)
+    }
+
+    // 元のセッションはそのまま残す（保存時に上書き更新される）
 
     // セッションリストを閉じる
     state.performance.showSessionList = false

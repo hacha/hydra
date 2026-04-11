@@ -48,6 +48,8 @@ export default function galleryStore(state, emitter) {
           // Check if hydra-strudel is ready before evaluating code
           const evalCode = async () => {
             await runPreload(emitter)
+            // resume/playback中はギャラリーからのコード上書きをスキップ
+            if (state.performance.isPlaying || state.performance._resumedSessionId) return
             emitter.emit('load and eval code', code, false)
             if(sketchFromURL) {
               emitter.emit('ui: hide info')
