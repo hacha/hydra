@@ -151,14 +151,22 @@ export default function performanceStore(state, emitter) {
     return buffer
   }
 
-  // 初期化時にメタデータを読み込み、自動録画を開始
+  // 初期化時にメタデータを読み込み、自動録画を開始（リロード時は前回バッファを引き継ぐ）
   emitter.on('DOMContentLoaded', () => {
     const meta = storage.getMeta()
     state.performance.sessions = meta.sessions
 
-    // 前回の未保存バッファを破棄して新規自動録画開始
-    startAutoBuffer()
-    console.log('[Performance] Auto-recording started')
+    // 前回バッファにスナップショットがあれば引き継ぐ
+    const prevBuffer = autoBuffer.get()
+    if (prevBuffer && prevBuffer.snapshots && prevBuffer.snapshots.length > 0) {
+      state.performance.autoBufferStartTime = prevBuffer.createdAt
+      state.performance.snapshotCount = prevBuffer.snapshots.length
+      state.performance._pendingCodeCheck = true
+      console.log(`[Performance] Resuming previous buffer (${prevBuffer.snapshots.length} snapshots)`)
+    } else {
+      startAutoBuffer()
+      console.log('[Performance] Auto-recording started')
+    }
 
     // URLパラメータをチェック
     const params = new URLSearchParams(window.location.search)
@@ -311,6 +319,19 @@ export default function performanceStore(state, emitter) {
   // コード評価時のスナップショット（repl: evalから呼ばれる）
   emitter.on('performance: snapshot', (code) => {
     if (!code) return
+
+    // リロード後の最初のeval: 前回バッファの最後のcodeと比較
+    if (state.performance._pendingCodeCheck) {
+      delete state.performance._pendingCodeCheck
+      const buffer = autoBuffer.get()
+      const lastCode = buffer?.snapshots?.findLast(s => s.code)?.code
+      if (lastCode !== code) {
+        // 違うコード → 新しいスケッチ。前回バッファを破棄して新規開始
+        startAutoBuffer()
+        console.log('[Performance] New sketch detected, starting fresh buffer')
+      }
+    }
+
     captureSnapshot(code)
   })
 
