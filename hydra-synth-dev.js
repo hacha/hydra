@@ -2295,14 +2295,17 @@ var _default = () => [{
     type: 'float',
     name: 'nSides',
     default: 4
+  }, {
+    type: 'float',
+    name: 'smoothness',
+    default: 0
   }],
   glsl: `   vec2 st = _st;
    st -= 0.5;
    float r = length(st);
-   float a = atan(st.y, st.x);
    float pi = 2.*3.1416;
-   a = mod(a,pi/nSides);
-   a = abs(a-pi/nSides/2.);
+   float a = atan(st.y, st.x) + pi/(2.*nSides);
+   a = abs(asin(sin(a*nSides*0.5)/(smoothness+1.0))) * 2.0/nSides;
    return r*vec2(cos(a), sin(a));`
 }, {
   name: 'modulateKaleid',
@@ -2311,13 +2314,16 @@ var _default = () => [{
     type: 'float',
     name: 'nSides',
     default: 4
+  }, {
+    type: 'float',
+    name: 'smoothness',
+    default: 0
   }],
   glsl: `   vec2 st = _st - 0.5;
    float r = length(st);
-   float a = atan(st.y, st.x);
    float pi = 2.*3.1416;
-   a = mod(a,pi/nSides);
-   a = abs(a-pi/nSides/2.);
+   float a = atan(st.y, st.x) + pi/(2.*nSides);
+   a = abs(asin(sin(a*nSides*0.5)/(smoothness+1.0))) * 2.0/nSides;
    return (_c0.r+r)*vec2(cos(a), sin(a));`
 }, {
   name: 'scroll',
@@ -3689,6 +3695,14 @@ var _default = {
 
     Array.prototype.s = Array.prototype.saw;
 
+    Array.prototype.hold = function (hold = 0.5) {
+      this._hold = hold;
+      if (!this._smooth) this._smooth = 1;
+      return this;
+    };
+
+    Array.prototype.h = Array.prototype.hold;
+
     Array.prototype.offset = function (offset = 0.5) {
       this._offset = offset % 1.0;
       return this;
@@ -3707,6 +3721,7 @@ var _default = {
       newArr._smooth = this._smooth;
       newArr._ease = this._ease;
       newArr._saw = this._saw;
+      newArr._hold = this._hold;
       return newArr;
     };
   },
@@ -3717,6 +3732,7 @@ var _default = {
     }) => {
       let speed = arr._speed ? arr._speed : 1;
       let smooth = arr._smooth ? arr._smooth : 0;
+      let hold = arr._hold ? arr._hold : 0;
       let index = parentCycle !== undefined ? parentCycle * speed + (arr._offset || 0) : time * speed * (bpm / 60) + (arr._offset || 0);
 
       const resolve = (val, cycle) => Array.isArray(val) ? getValue(val, cycle)({
@@ -3725,9 +3741,12 @@ var _default = {
       }) : val;
 
       if (smooth !== 0) {
-        let ease = arr._ease ? arr._ease : _easingFunctions.default['linear'];
+        let ease = arr._ease ? arr._ease : _easingFunctions.default['linear']; // hold extends each step: total step duration = (1 + hold), with `hold` held then 1 transitioning
 
-        let _index = index - smooth / 2;
+        let totalStep = 1 + hold;
+        let holdRatio = hold / totalStep; // when hold > 0, anchor each (stretched) step at the integer boundary (no centering shift)
+
+        let _index = hold > 0 ? index / totalStep : index - smooth / 2;
 
         let cycle = Math.floor(Math.max(0, _index) / arr.length);
         let currIndex = Math.floor(_index % arr.length);
@@ -3740,7 +3759,9 @@ var _default = {
           nextValue = resolve(arr[1 % arr.length], cycle);
         }
 
-        let t = Math.min(_index % 1 / smooth, 1);
+        let frac = _index % 1; // transition window within the stretched step = smooth * (1 - holdRatio)
+
+        let t = frac < holdRatio ? 0 : Math.min((frac - holdRatio) / (smooth * (1 - holdRatio)), 1);
         return ease(t) * (nextValue - currValue) + currValue;
       } else {
         let cycle = Math.floor(index / arr.length);
