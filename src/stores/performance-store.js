@@ -148,6 +148,8 @@ export default function performanceStore(state, emitter) {
     autoBuffer.save(buffer)
     state.performance.autoBufferStartTime = now
     state.performance.snapshotCount = 0
+    // 新規バッファでは最初のeditor全文を必ず記録できるよう重複排除をリセット
+    lastEditorText = null
     return buffer
   }
 
@@ -253,6 +255,9 @@ export default function performanceStore(state, emitter) {
   // 前回スナップショット時のperformance.now()を記録（MIDIバッファの切り出しに使用）
   let lastSnapshotPerfTime = performance.now()
 
+  // 前回記録したエディタ全文（変化が無いsnapshotでは省略するための重複排除用）
+  let lastEditorText = null
+
   // スナップショット記録の共通処理
   // code: 評価コード（nullならMIDIのみのスナップショット）
   function captureSnapshot(code) {
@@ -282,7 +287,19 @@ export default function performanceStore(state, emitter) {
       timestamp,
       absoluteTime: Date.now()
     }
-    if (code) snapshot.code = code
+    if (code) {
+      snapshot.code = code
+      // codeは「評価されたブロック」（ビジュアル再構築用）。
+      // editorは「その時点のエディタ全文」（seek時の表示復元用）で別物。
+      // 全体評価ではcode===全文だが、ブロック/行評価では両者が異なる。
+      try {
+        const editorText = state.editor?.editor?.getValue?.()
+        if (editorText != null && editorText !== lastEditorText) {
+          snapshot.editor = editorText
+          lastEditorText = editorText
+        }
+      } catch (e) { /* エディタ未準備時は無視 */ }
+    }
     if (midiEvents) snapshot.midi = midiEvents
 
     // YouTube再生位置を追加（YouTubeが読み込まれている場合）
@@ -319,6 +336,8 @@ export default function performanceStore(state, emitter) {
   // コード評価時のスナップショット（repl: evalから呼ばれる）
   emitter.on('performance: snapshot', (code) => {
     if (!code) return
+    // 累積リプレイ中の eval はライブ録画バッファに記録しない
+    if (state.performance._replaying) return
 
     // リロード後の最初のeval: 前回バッファの最後のcodeと比較
     if (state.performance._pendingCodeCheck) {
@@ -390,20 +409,8 @@ export default function performanceStore(state, emitter) {
       replayMidiEvents(state.midiInput, initialSnapshot.midi, speed)
     }
 
-    // コード付きスナップショットを探して適用（MIDIのみスナップショットの場合は遡る）
-    let codeToApply = initialSnapshot.code
-    if (!codeToApply) {
-      for (let i = initialIndex - 1; i >= 0; i--) {
-        if (session.snapshots[i].code) {
-          codeToApply = session.snapshots[i].code
-          break
-        }
-      }
-    }
-    if (codeToApply) {
-      emitter.emit('editor: load code', codeToApply)
-      emitter.emit('repl: eval', codeToApply)
-    }
+    // コードを累積適用（0..initialIndex を順に eval して全バッファの状態を再構築）
+    reconstructStateUpTo(session, emitter, state, initialIndex)
 
     // YouTube同期再生開始（セッションにYouTube情報がある場合）
     if (session.youtube?.videoId) {
@@ -588,17 +595,8 @@ export default function performanceStore(state, emitter) {
       replayMidiEvents(state.midiInput, snapshot.midi, state.performance.playbackSpeed)
     }
 
-    // コードを適用（無ければ直前のコード付きスナップショットを探す）
-    let code = snapshot.code
-    if (!code) {
-      for (let i = targetIndex - 1; i >= 0; i--) {
-        if (session.snapshots[i].code) { code = session.snapshots[i].code; break }
-      }
-    }
-    if (code) {
-      emitter.emit('editor: load code', code)
-      emitter.emit('repl: eval', code)
-    }
+    // コードを累積適用（後方ジャンプなので0..targetIndexを順にevalして全バッファを再構築）
+    reconstructStateUpTo(session, emitter, state, targetIndex)
 
     // YouTubeシーク
     if (snapshot.youtubeTime !== undefined) {
@@ -648,17 +646,19 @@ export default function performanceStore(state, emitter) {
       replayMidiEvents(state.midiInput, snapshot.midi, state.performance.playbackSpeed)
     }
 
-    // コードを適用（無ければ直前のコード付きスナップショットを探す）
-    let code = snapshot.code
-    if (!code) {
-      for (let i = targetIndex - 1; i >= 0; i--) {
-        if (session.snapshots[i].code) { code = session.snapshots[i].code; break }
+    // コードがあれば評価（前進1ステップなので単一ブロックでよい。累積状態は直前まで構築済み）
+    // 再生中の eval は録画バッファに記録しない
+    if (snapshot.code) {
+      state.performance._replaying = true
+      try {
+        emitter.emit('repl: eval', snapshot.code)
+      } finally {
+        state.performance._replaying = false
       }
     }
-    if (code) {
-      emitter.emit('editor: load code', code)
-      emitter.emit('repl: eval', code)
-    }
+    // エディタ表示は全文(editor)を復元。無ければ評価ブロックにフォールバック。
+    const display = snapshot.editor != null ? snapshot.editor : snapshot.code
+    if (display != null) emitter.emit('editor: load code', display)
 
     // YouTubeシーク
     if (snapshot.youtubeTime !== undefined) {
@@ -704,17 +704,8 @@ export default function performanceStore(state, emitter) {
       replayMidiEvents(state.midiInput, snapshot.midi, state.performance.playbackSpeed)
     }
 
-    // コードを適用（無ければ直前のコード付きスナップショットを探す）
-    let code = snapshot.code
-    if (!code) {
-      for (let i = index - 1; i >= 0; i--) {
-        if (session.snapshots[i].code) { code = session.snapshots[i].code; break }
-      }
-    }
-    if (code) {
-      emitter.emit('editor: load code', code)
-      emitter.emit('repl: eval', code)
-    }
+    // コードを累積適用（0..index を順に eval して全バッファの状態を再構築）
+    reconstructStateUpTo(session, emitter, state, index)
 
     // YouTubeシーク（YouTube側からのseek時は不要 → 無限ループ防止）
     if (snapshot.youtubeTime !== undefined && !state.performance._seekFromYoutube) {
@@ -1059,13 +1050,53 @@ function scheduleNextSnapshot(session, emitter, state) {
   state.performance.playbackTimerId = setTimeout(() => {
     if (!state.performance.isPlaying) return
 
-    // コードがあればエディタに設定して実行
+    // コードがあれば評価（ビジュアル）。再生中の eval は録画バッファに記録しない。
     if (snapshot.code) {
-      emitter.emit('editor: load code', snapshot.code)
-      emitter.emit('repl: eval', snapshot.code)
+      state.performance._replaying = true
+      try {
+        emitter.emit('repl: eval', snapshot.code)
+      } finally {
+        state.performance._replaying = false
+      }
     }
+    // エディタ表示は全文(editor)を復元。無ければ評価ブロックにフォールバック。
+    const display = snapshot.editor != null ? snapshot.editor : snapshot.code
+    if (display != null) emitter.emit('editor: load code', display)
 
     state.performance.playbackIndex++
     scheduleNextSnapshot(session, emitter, state)
   }, delay)
+}
+
+// seek/再生開始/backで index 時点の状態を復元する。
+//
+// 前進再生は評価ブロック(code)を順に当てて状態を積み上げるが、ジャンプ時は
+// 履歴を replay せず「その時点のエディタ全文(editor)を丸ごと評価し直す」
+// （= eval all 相当）。これにより、エディタが定義する全バッファが 1 回の eval で
+// 再構築され、長尺セッションでも seek が軽い。
+//   ※ トレードオフ: エディタから削除済みだが裏で生きているバッファは復元されない。
+//     また、その時点のエディタに未評価/書きかけのブロックがあれば一緒に走る
+//     （eval all を押したのと同じ挙動）。
+//   ※ editor 全文が無い旧データは最も近い評価ブロックにフォールバック。
+//   ※ _replaying フラグで再生中の eval をライブ録画バッファに記録させない。
+function reconstructStateUpTo(session, emitter, state, index) {
+  // その時点のエディタ全文（無ければ最も近い評価ブロック）
+  let fullCode = null
+  for (let i = index; i >= 0; i--) {
+    if (session.snapshots[i]?.editor != null) { fullCode = session.snapshots[i].editor; break }
+  }
+  if (fullCode == null) {
+    for (let i = index; i >= 0; i--) {
+      if (session.snapshots[i]?.code != null) { fullCode = session.snapshots[i].code; break }
+    }
+  }
+  if (fullCode == null) return
+
+  emitter.emit('editor: load code', fullCode)
+  state.performance._replaying = true
+  try {
+    emitter.emit('repl: eval', fullCode) // 全体評価
+  } finally {
+    state.performance._replaying = false
+  }
 }
