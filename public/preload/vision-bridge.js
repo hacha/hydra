@@ -41,6 +41,31 @@ if (!canvas) {
 const params = new URLSearchParams(location.search)
 const id = params.get('vbId') || 'host'
 const signalingUrl = params.get('signaling') || `ws://${location.hostname || 'localhost'}:8080`
+// 画面共有の送出解像度の高さ上限。Retina タブは 3600x1964 (約7MP) でキャプチャされ、
+// MBP は HW H264 で 30fps 送出できるが Quest のデコード/描画が追いつかず受信側 fps が落ちる。
+// 高解像度ほど Quest のデコード負荷が増え受信側 fps が落ちる。720p で fps が出やすく、
+// コード文字も概ね読める。?vbMaxH=1080 等で調整可（くっきり寄り↔fps寄り）。
+const maxHeight = parseInt(params.get('vbMaxH') || '720', 10)
+// 解像度を落としてデコード余力ができたので、hydra アニメーションの滑らかさ優先で 60fps を狙う。
+// タブキャプチャ/Quest が出せなければ実測はこれ未満になる。?vbFps=30 等で調整可。
+const maxFps = parseInt(params.get('vbFps') || '60', 10)
+// 送出ビットレート上限(kbps)。LAN は帯域余裕なので大きめ。低いとエンコーダが fps を削る。?vbKbps= で調整可。
+const maxKbps = parseInt(params.get('vbKbps') || '15000', 10)
+
+// 送出 sender を「fps 優先」にチューニングする。スクリーン共有 track は既定で
+// 解像度維持・fps犠牲なので、maintain-framerate + 十分な bitrate + maxFramerate で覆す。
+async function tuneSender(sender) {
+  try {
+    const p = sender.getParameters()
+    if (!p.encodings || !p.encodings.length) p.encodings = [{}]
+    p.encodings[0].maxBitrate = maxKbps * 1000
+    p.encodings[0].maxFramerate = maxFps
+    p.degradationPreference = 'maintain-framerate'
+    await sender.setParameters(p)
+  } catch (e) {
+    console.warn('[vb-hydra] setParameters 失敗', e)
+  }
+}
 
 const log = (...args) => console.log('[vb-hydra]', ...args)
 
@@ -97,12 +122,28 @@ async function startScreenShare() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
     throw new Error('getDisplayMedia 不可 — secure context が必要です。MBP では http://localhost:5173/ で開いてください (IP+HTTP は不可)')
   }
+  const videoConstraints = {
+    frameRate: { ideal: maxFps, max: maxFps },
+    width: { max: Math.round((maxHeight * 16) / 9) },
+    height: { max: maxHeight },
+  }
   const stream = await navigator.mediaDevices.getDisplayMedia({
-    video: { frameRate: { ideal: 30 } },
+    video: videoConstraints,
     audio: false,
     preferCurrentTab: true, // Chrome: ピッカーを現在タブに固定
   })
   outputTrack = stream.getVideoTracks()[0]
+  // スクリーン共有 track の既定は detail(精細優先・fps犠牲)。render の滑らかさ優先なので motion に。
+  outputTrack.contentHint = 'motion'
+  // タブ/画面キャプチャは getDisplayMedia 初期呼び出しで解像度制約を無視することがあるので
+  // applyConstraints でも明示的に上限を効かせる (Retina の過大解像度をデコード可能な範囲へ)。
+  try {
+    await outputTrack.applyConstraints(videoConstraints)
+  } catch (e) {
+    console.warn('[vb-hydra] applyConstraints 失敗', e)
+  }
+  const st = outputTrack.getSettings()
+  log('画面共有 解像度', st.width + 'x' + st.height, '@', st.frameRate, 'fps (上限', maxHeight + 'p)')
   for (const sender of outputSenders.values()) {
     try { await sender.replaceTrack(outputTrack) } catch (e) { console.warn('[vb-hydra] replaceTrack 失敗', e) }
   }
@@ -112,7 +153,7 @@ async function startScreenShare() {
   outputTrack.addEventListener('ended', () => {
     log('画面共有が停止されました — プレースホルダに戻す')
     outputTrack = makePlaceholderTrack()
-    for (const sender of outputSenders.values()) sender.replaceTrack(outputTrack).catch(() => {})
+    for (const sender of outputSenders.values()) sender.replaceTrack(outputTrack).catch(() => { })
     shareBtn.disabled = false
     shareBtn.style.display = ''
   })
@@ -231,7 +272,8 @@ vb.onIncoming(async (peer, offer) => {
     outputSenders.set(peer.remoteId, outSender)
     // この acceptOffer の進行中に画面共有が開始/停止されると、addTrack した track と
     // 現在の outputTrack がズレうる。ズレていたら即 replaceTrack で揃える (happy path では no-op)。
-    if (outSender.track !== outputTrack) outSender.replaceTrack(outputTrack).catch(() => {})
+    if (outSender.track !== outputTrack) outSender.replaceTrack(outputTrack).catch(() => { })
+    void tuneSender(outSender) // fps 優先 (maintain-framerate + bitrate + maxFramerate)
   }
   log('answered', peer.remoteId, '→ 送出 track をセット')
 
@@ -249,3 +291,31 @@ vb.onIncoming(async (peer, offer) => {
 })
 
 log('hub ready — 右上のボタンで画面共有を開始してください。s0=hmd1, s1=hmd2。例: src(s0).blend(s1).out(o0)')
+
+// 実 fps 計測ログ (?vbStats=1 で有効化)。capture(媒体源) と各 outbound の実 fps を出す。
+// cap が vbFps に届かなければタブキャプチャが上限、cap は高いが send が低ければエンコード/送出側。
+if (params.get('vbStats') === '1') {
+  const prev = new Map() // outbound-rtp.id -> { bytes, ts } 実ビットレート算出用
+  setInterval(async () => {
+    for (const [pid, peer] of connectedPeers) {
+      const parts = []
+      const stats = await peer.pc.getStats()
+      stats.forEach((r) => {
+        if (r.type === 'media-source' && r.kind === 'video') {
+          parts.push(`cap ${r.width}x${r.height}@${Math.round(r.framesPerSecond || 0)}`)
+        }
+        if (r.type === 'outbound-rtp' && r.kind === 'video') {
+          let kbps = '?'
+          const p = prev.get(r.id)
+          if (p && r.timestamp > p.ts) {
+            kbps = Math.round(((r.bytesSent - p.bytes) * 8) / ((r.timestamp - p.ts) / 1000) / 1000)
+          }
+          prev.set(r.id, { bytes: r.bytesSent, ts: r.timestamp })
+          const tgt = r.targetBitrate ? Math.round(r.targetBitrate / 1000) : '?'
+          parts.push(`send[${r.contentType || '?'}] ${r.frameWidth}x${r.frameHeight}@${Math.round(r.framesPerSecond || 0)} ${kbps}kbps(tgt ${tgt}, 上限 ${maxKbps}) ql=${r.qualityLimitationReason}`)
+        }
+      })
+      log('fps', pid, parts.join(' | '))
+    }
+  }, 2000)
+}
