@@ -1,0 +1,1 @@
+/Users/hacha/projects/VisionBridge/dist/vision-bridge.umd.cjs

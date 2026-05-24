@@ -17,6 +17,9 @@ export default defineConfig(({ mode }) => {
         ? '/libs/hydra-strudel.js'
         : 'https://cdn.jsdelivr.net/gh/atfornes/Hydra-strudel-extension@latest/hydra-strudel.js'
 
+    // VisionBridge は LAN/dev 用途。dev では public/libs の symlink (→ VisionBridge/dist) を参照。
+    const defaultVisionBridgeUrl = '/libs/vision-bridge.js'
+
     const defaultFontUrl = isDevelopment
         ? '/fonts/chivo.css'
         : 'https://fonts.googleapis.com/css?family=Chivo:300,400,700'
@@ -44,6 +47,7 @@ export default defineConfig(({ mode }) => {
                         VITE_HYDRA_SYNTH_URL: process.env.VITE_HYDRA_SYNTH_URL || defaultHydraSynthUrl,
                         VITE_P5_URL: process.env.VITE_P5_URL || defaultP5Url,
                         VITE_HYDRA_STRUDEL_URL: process.env.VITE_HYDRA_STRUDEL_URL || defaultHydraStrudelUrl,
+                        VITE_VISION_BRIDGE_URL: process.env.VITE_VISION_BRIDGE_URL || defaultVisionBridgeUrl,
                         VITE_FONT_URL: process.env.VITE_FONT_URL || defaultFontUrl,
                         VITE_FAVICON_URL: process.env.VITE_FAVICON_URL || defaultFaviconUrl
                     }
@@ -56,6 +60,7 @@ export default defineConfig(({ mode }) => {
             'VITE_HYDRA_SYNTH_URL': JSON.stringify(process.env.VITE_HYDRA_SYNTH_URL || defaultHydraSynthUrl),
             'VITE_P5_URL': JSON.stringify(process.env.VITE_P5_URL || defaultP5Url),
             'VITE_HYDRA_STRUDEL_URL': JSON.stringify(process.env.VITE_HYDRA_STRUDEL_URL || defaultHydraStrudelUrl),
+            'VITE_VISION_BRIDGE_URL': JSON.stringify(process.env.VITE_VISION_BRIDGE_URL || defaultVisionBridgeUrl),
             'VITE_FONT_URL': JSON.stringify(process.env.VITE_FONT_URL || defaultFontUrl),
             'VITE_FAVICON_URL': JSON.stringify(process.env.VITE_FAVICON_URL || defaultFaviconUrl),
             // Resolution settings are now handled by import.meta.env
