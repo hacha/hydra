@@ -53,7 +53,7 @@ const maxFps = parseInt(params.get('vbFps') || '60', 10)
 const maxKbps = parseInt(params.get('vbKbps') || '25000', 10)
 // 詰まった時の劣化方針。maintain-framerate=fps死守(解像度犠牲) / maintain-resolution=解像度死守(fps犠牲)
 // / balanced=両方ほどよく。?vbDegrade= で調整可。
-const degradePref = params.get('vbDegrade') || 'balanced'
+const degradePref = params.get('vbDegrade') || 'maintain-resolution'
 // リレー(相手 HMD の生カメラ)を HMD へ再送する際の格下げ設定。アップリンク(peer→hub)には影響しない。
 // 相手カメラは副次情報なので解像度・fps を落として hydra 合成に帯域/デコードを回す。
 const relayScale = parseFloat(params.get('vbRelayScale') || '8') // scaleResolutionDownBy (例 1280x960→640x480)
@@ -74,8 +74,11 @@ async function tuneRelaySender(sender) {
   }
 }
 
-// 送出 sender を「fps 優先」にチューニングする。スクリーン共有 track は既定で
-// 解像度維持・fps犠牲なので、maintain-framerate + 十分な bitrate + maxFramerate で覆す。
+// 合成 track の送出 sender をチューニングする。bitrate/framerate 上限に加え degradationPreference を設定。
+// 既定 maintain-resolution の狙い: 複数 HMD が1つの getDisplayMedia ソースを共有するため、帯域の弱い peer
+// (低バッテリー等) が「ソース解像度を下げてくれ」と要求すると、共有ソースが縮小し帯域のある peer まで
+// 道連れになる。maintain-resolution なら各 encoder は解像度を保ち fps を犠牲にするので、弱い peer が
+// ソースを引き下げず、強い peer は高解像度を維持できる。
 async function tuneSender(sender) {
   try {
     const p = sender.getParameters()
@@ -320,11 +323,18 @@ log('hub ready — 右上のボタンで画面共有を開始してください�
 // cap が vbFps に届かなければタブキャプチャが上限、cap は高いが send が低ければエンコード/送出側。
 if (params.get('vbStats') === '1') {
   const prev = new Map() // outbound-rtp.id -> { bytes, ts } 実ビットレート算出用
+  const prevLost = new Map() // remote-inbound-rtp.ssrc -> packetsLost (差分でロス率算出用)
+  const sid = Math.random().toString(36).slice(2, 6) // ページロードごとに変わる。古いログとの区別用
+  log('stats session', sid)
   setInterval(async () => {
     for (const [pid, peer] of connectedPeers) {
-      const parts = []
+      const parts = [`#${sid}`]
       const stats = await peer.pc.getStats()
+      const remoteCands = new Map() // candidate id -> address (相手の接続元 IP 特定用)
+      let activeRemoteCandId = null
       stats.forEach((r) => {
+        if (r.type === 'remote-candidate') remoteCands.set(r.id, r.address || r.ip)
+        if (r.type === 'candidate-pair' && r.availableOutgoingBitrate) activeRemoteCandId = r.remoteCandidateId
         if (r.type === 'media-source' && r.kind === 'video') {
           parts.push(`cap ${r.width}x${r.height}@${Math.round(r.framesPerSecond || 0)}`)
         }
@@ -338,7 +348,22 @@ if (params.get('vbStats') === '1') {
           const tgt = r.targetBitrate ? Math.round(r.targetBitrate / 1000) : '?'
           parts.push(`send[${r.contentType || '?'}] ${r.frameWidth}x${r.frameHeight}@${Math.round(r.framesPerSecond || 0)} ${kbps}kbps(tgt ${tgt}, 上限 ${maxKbps}) ql=${r.qualityLimitationReason}`)
         }
+        // 受信側(HMD)が報告するパケットロス。BWE 崩壊=WiFi ロスの確証になる。
+        if (r.type === 'remote-inbound-rtp' && r.kind === 'video') {
+          const lost = r.packetsLost || 0
+          const dLost = lost - (prevLost.get(r.ssrc) || 0)
+          prevLost.set(r.ssrc, lost)
+          parts.push(`loss[${r.ssrc}] +${dLost} (frac ${(r.fractionLost || 0).toFixed(3)})`)
+        }
+        // 推定利用可能帯域(BWE)と実 RTT。BWE が低く RTT が高ければ遅延ベースで絞られている。
+        // availableOutgoingBitrate は使用中の pair にのみ載るので存在チェックで拾う。
+        if (r.type === 'candidate-pair' && r.availableOutgoingBitrate) {
+          const rtt = r.currentRoundTripTime != null ? Math.round(r.currentRoundTripTime * 1000) + 'ms' : '?'
+          parts.push(`BWE ${Math.round(r.availableOutgoingBitrate / 1000)}kbps rtt ${rtt}`)
+        }
       })
+      const fromAddr = activeRemoteCandId ? remoteCands.get(activeRemoteCandId) : null
+      if (fromAddr) parts.push(`from ${fromAddr}`)
       log('fps', pid, parts.join(' | '))
     }
   }, 2000)
