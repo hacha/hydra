@@ -50,7 +50,10 @@ const maxHeight = parseInt(params.get('vbMaxH') || '720', 10)
 // タブキャプチャ/Quest が出せなければ実測はこれ未満になる。?vbFps=30 等で調整可。
 const maxFps = parseInt(params.get('vbFps') || '60', 10)
 // 送出ビットレート上限(kbps)。LAN は帯域余裕なので大きめ。低いとエンコーダが fps を削る。?vbKbps= で調整可。
-const maxKbps = parseInt(params.get('vbKbps') || '15000', 10)
+const maxKbps = parseInt(params.get('vbKbps') || '25000', 10)
+// 詰まった時の劣化方針。maintain-framerate=fps死守(解像度犠牲) / maintain-resolution=解像度死守(fps犠牲)
+// / balanced=両方ほどよく。?vbDegrade= で調整可。
+const degradePref = params.get('vbDegrade') || 'balanced'
 // リレー(相手 HMD の生カメラ)を HMD へ再送する際の格下げ設定。アップリンク(peer→hub)には影響しない。
 // 相手カメラは副次情報なので解像度・fps を落として hydra 合成に帯域/デコードを回す。
 const relayScale = parseFloat(params.get('vbRelayScale') || '8') // scaleResolutionDownBy (例 1280x960→640x480)
@@ -79,7 +82,7 @@ async function tuneSender(sender) {
     if (!p.encodings || !p.encodings.length) p.encodings = [{}]
     p.encodings[0].maxBitrate = maxKbps * 1000
     p.encodings[0].maxFramerate = maxFps
-    p.degradationPreference = 'maintain-framerate'
+    p.degradationPreference = degradePref
     await sender.setParameters(p)
   } catch (e) {
     console.warn('[vb-hydra] setParameters 失敗', e)
