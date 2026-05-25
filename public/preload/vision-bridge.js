@@ -51,6 +51,25 @@ const maxHeight = parseInt(params.get('vbMaxH') || '720', 10)
 const maxFps = parseInt(params.get('vbFps') || '60', 10)
 // 送出ビットレート上限(kbps)。LAN は帯域余裕なので大きめ。低いとエンコーダが fps を削る。?vbKbps= で調整可。
 const maxKbps = parseInt(params.get('vbKbps') || '15000', 10)
+// リレー(相手 HMD の生カメラ)を HMD へ再送する際の格下げ設定。アップリンク(peer→hub)には影響しない。
+// 相手カメラは副次情報なので解像度・fps を落として hydra 合成に帯域/デコードを回す。
+const relayScale = parseFloat(params.get('vbRelayScale') || '8') // scaleResolutionDownBy (例 1280x960→640x480)
+const relayFps = parseInt(params.get('vbRelayFps') || '12', 10)
+const relayKbps = parseInt(params.get('vbRelayKbps') || '2000', 10)
+
+// リレー sender を格下げ (解像度↓・fps↓・bitrate↓)。受信した track を再エンコードして送るので効く。
+async function tuneRelaySender(sender) {
+  try {
+    const p = sender.getParameters()
+    if (!p.encodings || !p.encodings.length) p.encodings = [{}]
+    p.encodings[0].scaleResolutionDownBy = relayScale
+    p.encodings[0].maxFramerate = relayFps
+    p.encodings[0].maxBitrate = relayKbps * 1000
+    await sender.setParameters(p)
+  } catch (e) {
+    console.warn('[vb-hydra] relay setParameters 失敗', e)
+  }
+}
 
 // 送出 sender を「fps 優先」にチューニングする。スクリーン共有 track は既定で
 // 解像度維持・fps犠牲なので、maintain-framerate + 十分な bitrate + maxFramerate で覆す。
@@ -206,7 +225,9 @@ async function crossForward() {
       const key = `${toId}<-${fromId}`
       if (forwarded.has(key)) continue
       forwarded.add(key)
-      relaySenders.set(key, toPeer.addTrack(track))
+      const relaySender = toPeer.addTrack(track)
+      relaySenders.set(key, relaySender)
+      void tuneRelaySender(relaySender) // 480p/24fps 程度に格下げ
       added = true
       log('forwarding raw', fromId, '→', toId)
     }
