@@ -59,6 +59,15 @@ const degradePref = params.get('vbDegrade') || 'maintain-resolution'
 const relayScale = parseFloat(params.get('vbRelayScale') || '8') // scaleResolutionDownBy (例 1280x960→640x480)
 const relayFps = parseInt(params.get('vbRelayFps') || '12', 10)
 const relayKbps = parseInt(params.get('vbRelayKbps') || '2000', 10)
+// peer 画面(相手 HMD の生カメラのリレー)。?vbPeer=0 で無効化。リレーは host で decode+再encode を
+// 行うため fps 落ち込みの主因になりやすい。落ちる時はまずこれを切る。
+const peerRelayEnabled = params.get('vbPeer') !== '0'
+// hmd2 への hydra 画面共有。?vbShareHmd2=0 で hmd2 には黒を送り続ける(hmd1 のみ共有)。
+// hmd2 が弱い接続だと共有ソース(getDisplayMedia)が縮小して hmd1 まで道連れになるため、
+// 最悪時は hmd2 を切ると hmd1 の品質/fps を守れる。
+const shareToHmd2 = params.get('vbShareHmd2') !== '0'
+// この peer に実画面共有を送るか (hmd2 が無効化されていれば黒のまま)。
+const wantsShare = (peerId) => peerId !== 'hmd2' || shareToHmd2
 
 // リレー sender を格下げ (解像度↓・fps↓・bitrate↓)。受信した track を再エンコードして送るので効く。
 async function tuneRelaySender(sender) {
@@ -133,6 +142,8 @@ const makePlaceholderTrack = () => {
 }
 let outputTrack = makePlaceholderTrack()       // 現在 HMD に送っている合成 video track
 const outputSenders = new Map()                // peerId -> 合成 track の RTCRtpSender
+// 共有を送らない peer (hmd2 無効時) に固定で送る黒 track。実 track に差し替えない。
+const disabledTrack = makePlaceholderTrack()
 
 // getDisplayMedia はユーザージェスチャからしか呼べないため開始ボタンを出す。
 // choo の body 再 morph で剥がされないよう <html> 直下 (管理対象外) に置く。
@@ -169,7 +180,8 @@ async function startScreenShare() {
   }
   const st = outputTrack.getSettings()
   log('画面共有 解像度', st.width + 'x' + st.height, '@', st.frameRate, 'fps (上限', maxHeight + 'p)')
-  for (const sender of outputSenders.values()) {
+  for (const [pid, sender] of outputSenders) {
+    if (!wantsShare(pid)) continue // hmd2 無効時は黒のまま
     try { await sender.replaceTrack(outputTrack) } catch (e) { console.warn('[vb-hydra] replaceTrack 失敗', e) }
   }
   log('画面共有を開始 — 送出 track を', outputSenders.size, 'peer に差し替え')
@@ -178,7 +190,10 @@ async function startScreenShare() {
   outputTrack.addEventListener('ended', () => {
     log('画面共有が停止されました — プレースホルダに戻す')
     outputTrack = makePlaceholderTrack()
-    for (const sender of outputSenders.values()) sender.replaceTrack(outputTrack).catch(() => { })
+    for (const [pid, sender] of outputSenders) {
+      if (!wantsShare(pid)) continue // hmd2 無効時は触らない(既に黒)
+      sender.replaceTrack(outputTrack).catch(() => { })
+    }
     shareBtn.disabled = false
     shareBtn.style.display = ''
   })
@@ -223,6 +238,7 @@ const relaySenders = new Map()        // "to<-from" -> その track の sender
 //     silently fail する (signaling は直列化されない)。connected を待てば peer は
 //     idle で安定しているので安全に re-offer できる。
 async function crossForward() {
+  if (!peerRelayEnabled) return // ?vbPeer=0: 相手カメラのリレーをしない(host の再encode負荷を削減)
   for (const [toId, toPeer] of connectedPeers) {
     if (!ready.has(toId)) continue
     let added = false
@@ -298,9 +314,11 @@ vb.onIncoming(async (peer, offer) => {
   if (outSender) {
     outputSenders.set(peer.remoteId, outSender)
     // この acceptOffer の進行中に画面共有が開始/停止されると、addTrack した track と
-    // 現在の outputTrack がズレうる。ズレていたら即 replaceTrack で揃える (happy path では no-op)。
-    if (outSender.track !== outputTrack) outSender.replaceTrack(outputTrack).catch(() => { })
-    void tuneSender(outSender) // fps 優先 (maintain-framerate + bitrate + maxFramerate)
+    // 現在の outputTrack がズレうる。狙いの track に揃える (happy path では no-op)。
+    // hmd2 が無効化されていれば実画面ではなく黒 (disabledTrack) を送る。
+    const desired = wantsShare(peer.remoteId) ? outputTrack : disabledTrack
+    if (outSender.track !== desired) outSender.replaceTrack(desired).catch(() => { })
+    void tuneSender(outSender) // 解像度優先 (degradationPreference 既定 maintain-resolution, 理由は :86-90) + bitrate/fps 上限
   }
   log('answered', peer.remoteId, '→ 送出 track をセット')
 
@@ -318,6 +336,7 @@ vb.onIncoming(async (peer, offer) => {
 })
 
 log('hub ready — 右上のボタンで画面共有を開始してください。s0=hmd1, s1=hmd2。例: src(s0).blend(s1).out(o0)')
+log('設定: peer画面リレー', peerRelayEnabled ? 'ON' : 'OFF(?vbPeer=0)', '/ hmd2画面共有', shareToHmd2 ? 'ON' : 'OFF(?vbShareHmd2=0)')
 
 // 実 fps 計測ログ (?vbStats=1 で有効化)。capture(媒体源) と各 outbound の実 fps を出す。
 // cap が vbFps に届かなければタブキャプチャが上限、cap は高いが send が低ければエンコード/送出側。
