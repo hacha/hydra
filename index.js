@@ -1,5 +1,7 @@
 import devtools from 'choo-devtools'
 import choo from 'choo'
+// strudel mini-notation P()/mini() を同期的に提供(CDN 非同期ロードの置き換え)
+import './src/lib/strudel-mini.js'
 import store from './src/stores/store.js'
 import languageStore from './src/stores/language-store.js'
 import extensionStore from './src/stores/extension-store.js'

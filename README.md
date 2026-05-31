@@ -156,8 +156,16 @@ URLパラメータでセットアップスクリプトを自動読み込みで�
 - デフォルト解像度を1920x1080に変更
 - 環境変数による解像度設定のサポート
 
-### hydra-strudel拡張
-- デフォルトでhydra-strudel拡張を適用
+### hydra-strudel (mini記法 P())
+- `P("0@7 1")` のような mini記法シーケンスを利用可能
+- 旧: CDN から hydra-strudel 拡張一式（webaudio/tonal/ドラム音源サンプル）を非同期ロードしていたが、
+  P() が使えるまで数秒かかり undefined になるレースがあった
+- 現在: `@strudel.cycles/core` + `@strudel.cycles/mini` のみを `src/lib/strudel-mini.js` でバンドル同梱。
+  起動時 CDN ダウンロードを無くし `window.P` を同期的に提供（undefined レース解消）
+- クロックは hydra の `time`/`bpm` に連動（`cps = bpm/120`）。hydra ネイティブの配列シーケンサと速度が揃い、
+  例えば `P("0 1".slow(2))` と `[0,1].fast(.5)` が一致する（2ステップ校正。`bpm` 変更にも追従）
+- 文字列チェーン `"0 1".slow(2)` も利用可（String.prototype 経由、元実装踏襲）
+- オーディオ再生・ドラム音源・`shush`(Ctrl+.) は廃止（視覚用途では不要なため）
 
 ### 開発環境
 - 開発時はローカルのhydra-synthファイルを参照するように設定

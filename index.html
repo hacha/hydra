@@ -16,44 +16,12 @@
  <script src="%VITE_HYDRA_SYNTH_URL%"></script>
 
  <script src="%VITE_P5_URL%" defer></script>
-<script src="%VITE_HYDRA_STRUDEL_URL%" defer></script>
+<!-- hydra-strudel(P()/mini()) は src/lib/strudel-mini.js でバンドル同梱(旧: CDN非同期ロード) -->
 <!-- VisionBridge (UMD, global: visionBridge). preload=vision-bridge で hub 起動 -->
 <script src="%VITE_VISION_BRIDGE_URL%" defer></script>
  <!-- <script src="./bundle.js?1.2wsdajk" defer></script>  -->
  <script src="./index.js" defer type="module"></script>
-<script>
-  // Track hydra-strudel initialization state
-  window._hydraStrudelReady = false;
-  
-  // Wait for both hydra and strudel to be loaded
-  window.addEventListener('DOMContentLoaded', () => {
-    const checkHydraAndInitStrudel = () => {
-      if (window.hydraSynth && typeof initHydraStrudel === 'function') {
-        console.log('Initializing hydra-strudel...');
-        initHydraStrudel().then(() => {
-          console.log('hydra-strudel initialized successfully');
-          window._hydraStrudelReady = true;
-          // Emit custom event to signal readiness
-          window.dispatchEvent(new Event('hydra-strudel-ready'));
-        }).catch(err => {
-          console.error('Failed to initialize hydra-strudel:', err);
-        });
-      } else {
-        // Retry after a short delay
-        setTimeout(checkHydraAndInitStrudel, 100);
-      }
-    };
-    
-    // Listen for hydra loaded event or check after delay
-    window.addEventListener('hydra loaded', () => {
-      checkHydraAndInitStrudel();
-    });
-    
-    // Also check after a delay in case the event was already fired
-    setTimeout(checkHydraAndInitStrudel, 500);
-  });
-</script> 
- <link href="%VITE_FONT_URL%" rel="stylesheet"> 
+ <link href="%VITE_FONT_URL%" rel="stylesheet">
 <link rel="stylesheet" href="/css/fontawesome.css">
   <link rel="stylesheet" href="/css/codemirror.css">
   <link rel="stylesheet" href="/css/tomorrow-night-eighties.css">
