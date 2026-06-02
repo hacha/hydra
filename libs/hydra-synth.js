@@ -1562,6 +1562,8 @@ class GeneratorFactory {
         this.sourceClass.prototype.pix = this.sourceClass.prototype.pixelate;
       } else if (method === 'brightness') {
         this.sourceClass.prototype.bri = this.sourceClass.prototype.brightness;
+      } else if (method === 'gamma') {
+        this.sourceClass.prototype.gam = this.sourceClass.prototype.gamma;
       } else if (method === 'saturate') {
         this.sourceClass.prototype.sat = this.sourceClass.prototype.saturate;
       } else if (method === 'contrast') {
@@ -2558,6 +2560,15 @@ var _default = () => [{
     default: 0.4
   }],
   glsl: `   return vec4(_c0.rgb + vec3(amount), _c0.a);`
+}, {
+  name: 'gamma',
+  type: 'color',
+  inputs: [{
+    type: 'float',
+    name: 'amount',
+    default: 0.5
+  }],
+  glsl: `   return vec4(pow(max(_c0.rgb, vec3(0.0)), vec3(amount)), _c0.a);`
 }, {
   name: 'mask',
   type: 'combine',
