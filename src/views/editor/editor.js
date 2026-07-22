@@ -65,6 +65,8 @@ export default class Editor extends EventEmitter {
     const opts = {
       theme: 'tomorrow-night-eighties',
       value: 'hello',
+      // 起動直後にクリック無しで打てるようにする(これが無いとフォーカスは body のまま)
+      autofocus: true,
       mode: { name: 'javascript', globalVars: true },
       lineWrapping: true,
       styleSelectedText: true,
