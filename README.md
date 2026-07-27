@@ -133,6 +133,23 @@ URLパラメータでセットアップスクリプトを自動読み込みで�
 - `?playback=<sessionId>&start=<index>&speed=<倍率>` - 開始スナップショット番号（0始まり）と再生速度を指定
 - `?session=<url>` - 外部URLからセッションJSONをインポート（CORS対応が必要）
 
+**セッションの共有（share-session.mjs）**
+
+エクスポートしたセッションJSONをpublic gistにアップロードし、`?session=`付きの共有リンクを組み立てます（要 [gh CLI](https://cli.github.com/) / `gist`スコープ）。
+
+```bash
+npm run -s share-session -- hydra-session-foo.json
+# => https://hacha.github.io/hydra/?session=https%3A%2F%2Fgist.githubusercontent.com%2F...
+
+# リンクだけがstdoutに出るのでそのままコピーできる（-s を付けないとnpmのバナーが混ざる）
+npm run -s share-session -- hydra-session-foo.json | pbcopy
+
+# 直接実行でも同じ
+node share-session.mjs hydra-session-foo.json
+```
+
+主なオプション: `--desc <text>`（gistの説明）、`--name <file>`（gist上のファイル名）、`--base <url>`（公開先ベースURL）、`--latest`（コミットSHA固定ではなく最新追従のraw URLを使う）、`--dry-run`（gistを作らず検証のみ）。
+
 #### YouTube連携機能
 セッション記録・再生時にYouTube動画と同期できます。DJ mixなどを流しながらライブコーディングを練習し、後からその音楽と共に再生することを想定しています。
 

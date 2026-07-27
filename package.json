@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "vite build",
     "dev": "vite . --host ",
-    "publish": "gh-pages -d dist"
+    "publish": "gh-pages -d dist",
+    "share-session": "node share-session.mjs"
   },
   "author": "",
   "license": "AGPL",
