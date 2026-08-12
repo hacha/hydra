@@ -9,6 +9,9 @@ const STORAGE_META_KEY = 'hydra_performance_meta'
 const STORAGE_SESSION_PREFIX = 'hydra_perf_'
 const AUTO_BUFFER_KEY = 'hydra_perf_autobuffer'
 
+// 録画バッファの書き込みが失敗している状態を表す表示文字列
+const REC_ERROR = 'Recording stopped: storage full'
+
 // UUID生成
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -37,11 +40,16 @@ const storage = {
     }
   },
 
+  // 書き込み系は成否を返す。localStorageは容量超過で黙って失敗しうるが、
+  // 呼び出し側がそれを知らずに先へ進むと「メタにあるのに本体が無い」壊れた
+  // セッションが出来上がるため、例外を握りつぶしたままにしない。
   saveMeta(meta) {
     try {
       localStorage.setItem(STORAGE_META_KEY, JSON.stringify(meta))
+      return true
     } catch (e) {
       console.error('Failed to save performance meta:', e)
+      return false
     }
   },
 
@@ -58,8 +66,10 @@ const storage = {
   saveSession(session) {
     try {
       localStorage.setItem(STORAGE_SESSION_PREFIX + session.id, JSON.stringify(session))
+      return true
     } catch (e) {
       console.error('Failed to save session:', e)
+      return false
     }
   },
 
@@ -87,8 +97,10 @@ const autoBuffer = {
   save(buffer) {
     try {
       localStorage.setItem(AUTO_BUFFER_KEY, JSON.stringify(buffer))
+      return true
     } catch (e) {
       console.error('Failed to save auto-buffer:', e)
+      return false
     }
   },
 
@@ -126,7 +138,31 @@ export default function performanceStore(state, emitter) {
 
     // セッションリストUI
     showSessionList: false,
-    editingSessionId: null
+    editingSessionId: null,
+
+    // localStorage書き込み失敗の表示（false or メッセージ文字列）
+    storageError: false
+  }
+
+  // 消えない失敗表示。「保存できていない」「録画が止まっている」という継続状態
+  // だけに使う。ここに一時的な通知を混ぜると、赤帯が出ている＝録れていない、
+  // という意味が薄れて本物の警告に気づけなくなる。
+  function showStorageError(message) {
+    state.performance.storageError = message
+    state.performance.savedMessage = null
+    emitter.emit('render')
+  }
+
+  // 一時的な通知（3秒で消える）。ボタンが無反応にしか見えないのを防ぐ用。
+  function showNotice(message) {
+    state.performance.savedMessage = message
+    emitter.emit('render')
+    setTimeout(() => {
+      if (state.performance.savedMessage === message) {
+        state.performance.savedMessage = null
+        emitter.emit('render')
+      }
+    }, 3000)
   }
 
   // 自動録画バッファを新規作成する内部関数
@@ -145,7 +181,9 @@ export default function performanceStore(state, emitter) {
         startTime: 0
       } : null
     }
-    autoBuffer.save(buffer)
+    // ここで書けないと以降のcaptureSnapshotがバッファを読めず即returnするので、
+    // 録画が始まっていないことがどこにも出ないまま一晩無記録になる。
+    if (!autoBuffer.save(buffer)) showStorageError(REC_ERROR)
     state.performance.autoBufferStartTime = now
     state.performance.snapshotCount = 0
     // 新規バッファでは最初のeditor全文を必ず記録できるよう重複排除をリセット
@@ -197,6 +235,13 @@ export default function performanceStore(state, emitter) {
     }
   })
 
+  // 保存失敗時の共通処理。従来は失敗しても "Saved" と出して録画バッファを捨てて
+  // いたため、セッションが無言で全損していた。失敗は消えない表示で知らせる。
+  function failSave(message) {
+    showStorageError(message)
+    console.error(`[Performance] ${message} — buffer kept, export & delete old sessions to free space`)
+  }
+
   // セッション保存（自動録画バッファを正式セッションに昇格）
   emitter.on('performance: save session', () => {
     const buffer = autoBuffer.get()
@@ -214,8 +259,17 @@ export default function performanceStore(state, emitter) {
     // durationを設定
     buffer.duration = Date.now() - state.performance.autoBufferStartTime
 
-    // 正式セッションとして保存
-    storage.saveSession(buffer)
+    // 正式セッションとして保存。
+    // bufferはautoBufferキーにも同じ内容が入っているので、そのまま書くと保存の
+    // 瞬間だけ同じデータが2つ載り、ピーク使用量が倍になって容量超過を自分で
+    // 引き起こす。先にautoBuffer側を解放してから書き、失敗したら書き戻す。
+    // (bufferはメモリ上にあるので、この間にデータが失われることはない)
+    autoBuffer.clear()
+    if (!storage.saveSession(buffer)) {
+      autoBuffer.save(buffer)
+      failSave('Save failed: storage full')
+      return
+    }
 
     // メタデータを更新
     const meta = storage.getMeta()
@@ -228,8 +282,16 @@ export default function performanceStore(state, emitter) {
       preload: buffer.preload || null
     }
     meta.lastSessionId = buffer.id
-    storage.saveMeta(meta)
+    if (!storage.saveMeta(meta)) {
+      // メタが書けなければ本体は一覧に出ない孤児になる。容量だけ食うので巻き戻し、
+      // バッファも復元して再保存できる状態に戻す。
+      storage.deleteSession(buffer.id)
+      autoBuffer.save(buffer)
+      failSave('Save failed: storage full (meta)')
+      return
+    }
     state.performance.sessions = meta.sessions
+    state.performance.storageError = false
 
     const snapshotCount = buffer.snapshots.length
     console.log(`[Performance] Session saved: ${buffer.id} (${snapshotCount} snapshots)`)
@@ -264,7 +326,12 @@ export default function performanceStore(state, emitter) {
     if (!state.performance.autoBufferStartTime) return
 
     const buffer = autoBuffer.get()
-    if (!buffer) return
+    if (!buffer) {
+      // バッファの書き込みに失敗している（容量超過など）。黙って戻ると記録が
+      // 進んでいないことに気づけないので表示に出す。
+      if (state.performance.storageError !== REC_ERROR) showStorageError(REC_ERROR)
+      return
+    }
 
     const timestamp = Date.now() - state.performance.autoBufferStartTime
     const now = performance.now()
@@ -322,7 +389,17 @@ export default function performanceStore(state, emitter) {
     }
 
     buffer.snapshots.push(snapshot)
-    autoBuffer.save(buffer)
+    // ここが黙って失敗するとライブ中ずっと記録が進んでいないことになるので、
+    // 状態を変えたときだけ再描画して表示に出す。
+    const saved = autoBuffer.save(buffer)
+    // 保存失敗(REC_ERROR以外)の表示は上書きしない。次のeval一発で消えると、
+    // セッションが保存できていないことに気づかないまま演奏を続けてしまう。
+    const cur = state.performance.storageError
+    const nextError = saved ? (cur === REC_ERROR ? false : cur) : REC_ERROR
+    if (cur !== nextError) {
+      state.performance.storageError = nextError
+      emitter.emit('render')
+    }
     state.performance.snapshotCount = buffer.snapshots.length
 
     console.log(`[Performance] Snapshot added: ${timestamp}ms, ${code ? 'code' : 'midi'}${midiEvents ? ` (${midiEvents.length} midi events)` : ''}, total: ${buffer.snapshots.length}`)
@@ -372,6 +449,7 @@ export default function performanceStore(state, emitter) {
     const session = storage.getSession(sessionId)
     if (!session || session.snapshots.length === 0) {
       console.warn(`[Performance] Session not found or empty: ${sessionId}`)
+      showNotice('⚠ Session data missing — cannot play')
       return
     }
 
@@ -831,6 +909,7 @@ export default function performanceStore(state, emitter) {
     const session = storage.getSession(sessionId)
     if (!session) {
       console.warn(`[Performance] Session not found: ${sessionId}`)
+      showNotice('⚠ Session data missing — cannot resume')
       return
     }
 
@@ -901,6 +980,7 @@ export default function performanceStore(state, emitter) {
     const session = storage.getSession(sessionId)
     if (!session) {
       console.warn(`[Performance] Session not found: ${sessionId}`)
+      showNotice('⚠ Session data missing — cannot export')
       return
     }
 

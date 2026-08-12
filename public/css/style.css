@@ -167,6 +167,19 @@ a:hover {
   font-size: 11px;
 }
 
+/* 保存/録画の失敗。saved と違いフェードアウトさせない */
+#recording-indicator.storage-error {
+  opacity: 1;
+}
+
+#recording-indicator .storage-error-message {
+  color: #fff;
+  background: #c00;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
 @keyframes saved-fade {
   0%, 70% { opacity: 0.8; }
   100% { opacity: 0; }
@@ -354,6 +367,15 @@ a:hover {
   border-radius: 4px;
   cursor: pointer;
   margin-bottom: 4px;
+}
+
+/* 本体データが失われたセッション（再生・エクスポート不可） */
+.session-item.broken {
+  opacity: 0.45;
+}
+
+.session-item.broken .session-meta {
+  color: #f66;
 }
 
 .session-item:hover {

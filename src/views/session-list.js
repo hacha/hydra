@@ -16,12 +16,24 @@ function formatDate(timestamp) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+// メタにだけ残って本体が無いセッション。一覧では正常に見えるのに再生も
+// エクスポートも無反応になるため、行の時点で分かるようにする。
+function isBroken(sessionId) {
+  try {
+    return localStorage.getItem('hydra_perf_' + sessionId) === null
+  } catch (e) {
+    return false
+  }
+}
+
 export default function sessionList(state, emit) {
   if (!state.performance?.showSessionList) return html``
 
   const sessions = state.performance.sessions || {}
   const sessionArray = Object.values(sessions).sort((a, b) => b.createdAt - a.createdAt)
   const editingSessionId = state.performance.editingSessionId
+  // 再生中は50ms間隔でrenderが走るので、行ごとにlocalStorageを引かず1回で済ませる
+  const brokenIds = new Set(sessionArray.filter(s => isBroken(s.id)).map(s => s.id))
 
   const closeList = () => {
     emit('performance: hide session list')
@@ -108,12 +120,12 @@ export default function sessionList(state, emit) {
           ${sessionArray.length === 0
             ? html`<p class="no-sessions">No recorded sessions yet.<br>Press Ctrl+Shift+R to start recording.</p>`
             : sessionArray.map(session => html`
-              <div class="session-item">
+              <div class="session-item ${brokenIds.has(session.id) ? 'broken' : ''}">
                 <div class="session-info">
                   ${renderSessionName(session)}
                   <div class="session-meta">
                     ${formatDate(session.createdAt)} ·
-                    ${session.snapshotCount || 0} snapshots ·
+                    ${brokenIds.has(session.id) ? '⚠ data missing' : `${session.snapshotCount || 0} snapshots`} ·
                     ${formatDuration(session.duration)}${session.preload ? ` · 🎛 ${session.preload}` : ''}
                   </div>
                   <div class="session-id">${session.id}</div>

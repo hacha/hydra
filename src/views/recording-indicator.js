@@ -3,6 +3,16 @@ import html from 'choo/html'
 export default function recordingIndicator(state, emit) {
   const perf = state.performance
 
+  // 保存/録画の失敗表示。savedMessageより優先し、自動では消さない
+  // （消えると気づかないまま録り続けてしまうため）
+  if (perf?.storageError) {
+    return html`
+      <div id="recording-indicator" class="storage-error">
+        <span class="storage-error-message">⚠ ${perf.storageError}</span>
+      </div>
+    `
+  }
+
   // 保存確認メッセージ表示
   if (perf?.savedMessage) {
     return html`
