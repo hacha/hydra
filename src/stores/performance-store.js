@@ -202,7 +202,10 @@ export default function performanceStore(state, emitter) {
     // 新規バッファでは最初のeditor全文を必ず記録できるよう重複排除をリセット
     lastEditorText = null
     if (!ok) {
-      showStorageError(REC_ERROR)
+      // 保存失敗の表示が出ているならそれを優先する（captureSnapshot側と同じ方針）。
+      // どちらも容量超過を示すが、より具体的な方を残す。
+      const cur = state.performance.storageError
+      if (!cur || cur === REC_ERROR) showStorageError(REC_ERROR)
       return null
     }
     // 書けたなら録画は復旧している
@@ -315,24 +318,17 @@ export default function performanceStore(state, emitter) {
       preload: buffer.preload || null
     }
     meta.lastSessionId = buffer.id
-    let metaSaved = storage.saveMeta(meta)
-    let bufferRestarted = false
-
-    if (!metaSaved && existedBefore) {
-      // resume の上書き保存。本体は新しい内容で書けていて meta にも既に載っている
-      // ので、本体が正。バッファを書き戻すと同じ内容が2つ載って容量不足を悪化
-      // させるだけなので、新しいバッファで録画を続行する。
-      // その解放でバッファN個ぶんの空きが戻るため、metaをもう一度だけ試す。
-      startAutoBuffer()
-      bufferRestarted = true
-      metaSaved = storage.saveMeta(meta)
-    }
-
-    if (!metaSaved) {
+    if (!storage.saveMeta(meta)) {
       if (existedBefore) {
-        // 本体は新しい内容、metaは保存前の古い値のまま。一覧のsnapshotCount /
-        // duration / nameが実データと食い違うが、本体は存在するのでbroken判定には
-        // かからない。検知できない不整合なので文面で伝える。
+        // resume の上書き保存。本体は新しい内容で書けていて meta にも既に載って
+        // いるので、本体が正。バッファを書き戻すと同じ内容が2つ載って容量不足を
+        // 悪化させるだけなので、新しいバッファで録画を続行する。
+        // ただし meta は保存前の古い値のまま残る。一覧の snapshotCount /
+        // duration / name が実データと食い違うが、本体は存在するので broken 判定
+        // には引っかからない。検知できない不整合なので文面で伝える。
+        // (ここで saveMeta を再試行しても無意味。autoBufferは上の clear() で既に
+        //  解放済みで、startAutoBuffer は空きを増やさず小さいバッファを足すだけ)
+        startAutoBuffer()
         failSave('Save failed (meta) — body saved, list info may be stale')
       } else {
         // 新規セッション。本体だけ残ると一覧に出ないまま容量を食うので巻き戻し、
@@ -362,11 +358,9 @@ export default function performanceStore(state, emitter) {
       emitter.emit('render')
     }, 3000)
 
-    // 新しい自動録画バッファを開始（metaリトライ時に開始済みなら二重に作らない）
-    if (!bufferRestarted) {
-      startAutoBuffer()
-      console.log('[Performance] New auto-recording started')
-    }
+    // 新しい自動録画バッファを開始
+    startAutoBuffer()
+    console.log('[Performance] New auto-recording started')
   })
 
   // 後方互換: toggle recording → save session
