@@ -3,11 +3,20 @@ import html from 'choo/html'
 export default function recordingIndicator(state, emit) {
   const perf = state.performance
 
-  // 保存確認メッセージ表示
-  if (perf?.savedMessage) {
+  // 保存/録画の失敗表示と一時通知。
+  // 赤帯は自動では消さない（消えると気づかないまま録り続けてしまうため）が、
+  // 一時通知を握り潰してはいけない。通知が必要になるのは、まさに赤帯が
+  // 立っている状況（本体を失ったセッションを再生・エクスポートしようとした時）
+  // なので、片方だけ表示すると再生もエクスポートも無反応に見えてしまう。
+  if (perf?.storageError || perf?.savedMessage) {
     return html`
-      <div id="recording-indicator" class="saved">
-        <span class="saved-message">${perf.savedMessage}</span>
+      <div id="recording-indicator" class="${perf.storageError ? 'storage-error' : 'saved'}">
+        ${perf.storageError
+          ? html`<span class="storage-error-message">⚠ ${perf.storageError}</span>`
+          : ''}
+        ${perf.savedMessage
+          ? html`<span class="saved-message">${perf.savedMessage}</span>`
+          : ''}
       </div>
     `
   }

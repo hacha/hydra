@@ -1,4 +1,5 @@
 import html from 'choo/html'
+import { hasSessionBody } from '../stores/performance-store.js'
 
 // 時間フォーマット (ms -> mm:ss)
 function formatDuration(ms) {
@@ -22,6 +23,10 @@ export default function sessionList(state, emit) {
   const sessions = state.performance.sessions || {}
   const sessionArray = Object.values(sessions).sort((a, b) => b.createdAt - a.createdAt)
   const editingSessionId = state.performance.editingSessionId
+  // メタにだけ残って本体が無いセッション（再生もエクスポートもできない）。
+  // 再生を始めてもリストは閉じないため、開いたままだと50ms間隔のprogress
+  // intervalでrenderが回る。hasSessionBodyは値を読まずキーの有無だけ見る。
+  const brokenIds = new Set(sessionArray.filter(s => !hasSessionBody(s.id)).map(s => s.id))
 
   const closeList = () => {
     emit('performance: hide session list')
@@ -108,12 +113,12 @@ export default function sessionList(state, emit) {
           ${sessionArray.length === 0
             ? html`<p class="no-sessions">No recorded sessions yet.<br>Press Ctrl+Shift+R to start recording.</p>`
             : sessionArray.map(session => html`
-              <div class="session-item">
+              <div class="session-item ${brokenIds.has(session.id) ? 'broken' : ''}">
                 <div class="session-info">
                   ${renderSessionName(session)}
                   <div class="session-meta">
                     ${formatDate(session.createdAt)} ·
-                    ${session.snapshotCount || 0} snapshots ·
+                    ${brokenIds.has(session.id) ? '⚠ data missing' : `${session.snapshotCount || 0} snapshots`} ·
                     ${formatDuration(session.duration)}${session.preload ? ` · 🎛 ${session.preload}` : ''}
                   </div>
                   <div class="session-id">${session.id}</div>
