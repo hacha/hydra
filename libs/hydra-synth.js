@@ -1428,7 +1428,7 @@ class GeneratorFactory {
   }
 
   init() {
-    const functions = (0, _glslFunctions.default)();
+    let functions = (0, _glslFunctions.default)();
     this.glslTransforms = {};
     this.generators = Object.entries(this.generators).reduce((prev, [method, transform]) => {
       this.changeListener({
@@ -1445,12 +1445,18 @@ class GeneratorFactory {
 
 
     if (Array.isArray(this.extendTransforms)) {
-      functions.concat(this.extendTransforms);
+      functions = functions.concat(this.extendTransforms);
     } else if (typeof this.extendTransforms === 'object' && this.extendTransforms.type) {
       functions.push(this.extendTransforms);
     }
 
-    return functions.map(transform => this.setFunction(transform));
+    const generators = functions.map(transform => this.setFunction(transform)); // fork() blends the branch back into the chain by default
+
+    if (this.sourceClass.prototype.forkBlend) {
+      this.sourceClass.prototype.fork = this.sourceClass.prototype.forkBlend;
+    }
+
+    return generators;
   }
 
   _addMethod(method, transform) {
@@ -1602,6 +1608,22 @@ class GeneratorFactory {
         this.sourceClass.prototype.lay = this.sourceClass.prototype.layer;
       } else if (method === 'blend') {
         this.sourceClass.prototype.ble = this.sourceClass.prototype.blend;
+      } // add fork variants for combine functions, which branch the chain up to
+      // that point and combine the branch back in. i.e. forkBlend, forkDiff,
+      // forkModulate ... a fork variant is added for every alias as well,
+      // i.e. forkBle, forkMod, forkModRot
+
+
+      if (transform.type === 'combine' || transform.type === 'combineCoord') {
+        const proto = this.sourceClass.prototype;
+
+        const fork = function (fn, ...args) {
+          return this.forkWith(method, fn, ...args);
+        };
+
+        Object.getOwnPropertyNames(proto).filter(name => proto[name] === proto[method] && !name.startsWith('fork')).forEach(name => {
+          proto['fork' + name.charAt(0).toUpperCase() + name.slice(1)] = fork;
+        });
       }
     }
 
@@ -1732,6 +1754,53 @@ var GlslSource = function (obj) {
 
 GlslSource.prototype.addTransform = function (obj) {
   this.transforms.push(obj);
+}; // creates a copy of the chain up to this point, so that it can be branched
+// without modifying the original chain
+
+
+GlslSource.prototype._clone = function () {
+  const clone = Object.create(Object.getPrototypeOf(this));
+  Object.assign(clone, this);
+  clone.transforms = [...this.transforms];
+  return clone;
+}; // branches the chain up to this point, applies fn() to the branch,
+// and combines the result back into the chain using the given method.
+// i.e. src(s0).rotate().forkWith('blend', (c) => c.hue().kaleid(), [0, 1])
+// is equivalent to
+// src(s0).rotate().blend(src(s0).rotate().hue().kaleid(), [0, 1])
+
+
+GlslSource.prototype.forkWith = function (method, fn, ...args) {
+  const transform = this.synth && this.synth.glslTransforms && this.synth.glslTransforms[method];
+
+  if (typeof this[method] !== 'function' || !transform) {
+    console.warn(`fork: '${method}' is not a function`);
+    return this;
+  }
+
+  if (transform.type !== 'combine' && transform.type !== 'combineCoord') {
+    console.warn(`fork: '${method}' is a '${transform.type}' function, expected combine or combineCoord`);
+    return this;
+  }
+
+  if (typeof fn !== 'function') {
+    console.warn('fork: expected a function that receives the branched chain');
+    return this;
+  }
+
+  const branch = fn(this._clone());
+
+  if (!branch) {
+    console.warn('fork: the given function did not return a source');
+    return this;
+  }
+
+  if (branch === this) {
+    console.warn('fork: the given function returned the original chain (use the argument passed to it)');
+    return this;
+  }
+
+  return this[method](branch, ...args);
 };
 
 GlslSource.prototype.out = function (_output) {
