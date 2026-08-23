@@ -62,12 +62,16 @@ const relayKbps = parseInt(params.get('vbRelayKbps') || '2000', 10)
 // peer 画面(相手 HMD の生カメラのリレー)。?vbPeer=0 で無効化。リレーは host で decode+再encode を
 // 行うため fps 落ち込みの主因になりやすい。落ちる時はまずこれを切る。
 const peerRelayEnabled = params.get('vbPeer') !== '0'
+// hydra 画面共有そのもの。?vbShare=0 でどの HMD にも hydra 画面を送らない(全 peer に黒を送り続ける)。
+// 画面共有ボタンも出さない。HMD 同士のカメラリレーだけを使いたい時や、hub の送出負荷を
+// 完全に落としたい時に使う。
+const shareEnabled = params.get('vbShare') !== '0'
 // hmd2 への hydra 画面共有。?vbShareHmd2=0 で hmd2 には黒を送り続ける(hmd1 のみ共有)。
 // hmd2 が弱い接続だと共有ソース(getDisplayMedia)が縮小して hmd1 まで道連れになるため、
 // 最悪時は hmd2 を切ると hmd1 の品質/fps を守れる。
 const shareToHmd2 = params.get('vbShareHmd2') !== '0'
-// この peer に実画面共有を送るか (hmd2 が無効化されていれば黒のまま)。
-const wantsShare = (peerId) => peerId !== 'hmd2' || shareToHmd2
+// この peer に実画面共有を送るか (共有自体が無効、または hmd2 が無効化されていれば黒のまま)。
+const wantsShare = (peerId) => shareEnabled && (peerId !== 'hmd2' || shareToHmd2)
 
 // リレー sender を格下げ (解像度↓・fps↓・bitrate↓)。受信した track を再エンコードして送るので効く。
 async function tuneRelaySender(sender) {
@@ -150,7 +154,8 @@ const disabledTrack = makePlaceholderTrack()
 const shareBtn = document.createElement('button')
 shareBtn.textContent = '▶ HMD へ画面共有を開始'
 shareBtn.style.cssText = 'position:fixed;z-index:2147483647;top:8px;right:8px;padding:8px 12px;font:14px system-ui;background:#1a73e8;color:#fff;border:0;border-radius:6px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.4);'
-document.documentElement.appendChild(shareBtn)
+// ?vbShare=0 のときは共有しないのでボタン自体を出さない。
+if (shareEnabled) document.documentElement.appendChild(shareBtn)
 
 async function startScreenShare() {
   // getDisplayMedia は secure context (HTTPS か localhost) 限定。LAN の IP+HTTP で開くと
@@ -335,8 +340,12 @@ vb.onIncoming(async (peer, offer) => {
   }, { once: true })
 })
 
-log('hub ready — 右上のボタンで画面共有を開始してください。s0=hmd1, s1=hmd2。例: src(s0).blend(s1).out(o0)')
-log('設定: peer画面リレー', peerRelayEnabled ? 'ON' : 'OFF(?vbPeer=0)', '/ hmd2画面共有', shareToHmd2 ? 'ON' : 'OFF(?vbShareHmd2=0)')
+log(shareEnabled
+  ? 'hub ready — 右上のボタンで画面共有を開始してください。s0=hmd1, s1=hmd2。例: src(s0).blend(s1).out(o0)'
+  : 'hub ready — ?vbShare=0 のため HMD への画面共有はしません。s0=hmd1, s1=hmd2。')
+log('設定: peer画面リレー', peerRelayEnabled ? 'ON' : 'OFF(?vbPeer=0)',
+  '/ hydra画面共有', shareEnabled ? 'ON' : 'OFF(?vbShare=0)',
+  '/ hmd2画面共有', shareToHmd2 ? 'ON' : 'OFF(?vbShareHmd2=0)')
 
 // 実 fps 計測ログ (?vbStats=1 で有効化)。capture(媒体源) と各 outbound の実 fps を出す。
 // cap が vbFps に届かなければタブキャプチャが上限、cap は高いが send が低ければエンコード/送出側。
