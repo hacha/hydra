@@ -105,7 +105,7 @@ URLパラメータでセットアップスクリプトを自動読み込みで�
 | --- | --- |
 | `example` | MIDIヘルパーの最小例（cc / noteOn / bend） |
 | `20260407_NightRainbow` | AKAI MidiMix マッピング（ノブ・フェーダー・ループ操作） |
-| `20260907_NightRainbow` | InstaChord マッピング（Melody演奏モード / Key=C、ボタン7個 x 弦3本） |
+| `20260909_NightRainbow` | InstaChord マッピング（Melody演奏モード / Key=C、ボタン7個 x 弦3本） |
 | `vision-bridge` | HMD映像を s0/s1 に受けて画面を送り返すハブ |
 
 各preloadの詳細はスクリプト先頭のコメントを参照してください。

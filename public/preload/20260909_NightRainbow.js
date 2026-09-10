@@ -1,6 +1,6 @@
 // Preload: InstaChord mapping for nightrainbow
 // InstaChord (Melody演奏モード / Key=C) を MIDIコントローラとして使う
-// Usage: http://localhost:5173/?preload=20260907_NightRainbow
+// Usage: http://localhost:5173/?preload=20260909_NightRainbow
 //
 // 中央のボタン7個 x 弦3本 = 21音を ic<ボタン><弦> で参照する。
 // ボタン1..7 = C2から始まるCメジャースケール、弦0..2 = +0 / +12 / +24 半音。
