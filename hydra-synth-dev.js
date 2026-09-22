@@ -2284,6 +2284,10 @@ var _default = () => [{
     default: 3
   }, {
     type: 'float',
+    name: 'curve',
+    default: 1
+  }, {
+    type: 'float',
     name: 'offsetX',
     default: 0
   }, {
@@ -2294,7 +2298,9 @@ var _default = () => [{
   glsl: `   vec2 st = _st * vec2(repeatX, repeatY);
    st.x += step(1., mod(st.y,2.0)) * offsetX;
    st.y += step(1., mod(st.x,2.0)) * offsetY;
-   return 1.0 - abs(1.0 - mod(st, 2.0));`
+   vec2 u = (1.0 - abs(1.0 - mod(st, 2.0))) * 2.0 - 1.0;
+   u = sign(u) * pow(abs(u), vec2(max(curve, 0.001)));
+   return u * 0.5 + 0.5;`
 }, {
   name: 'modulateRepeat',
   type: 'combineCoord',
@@ -2564,6 +2570,15 @@ var _default = () => [{
   }],
   glsl: `   vec4 diffColor = vec4(abs(_c0.rgb-_c1.rgb), max(_c0.a, _c1.a));
    return _c0*(1.0-amount)+diffColor*amount;`
+}, {
+  name: 'screen',
+  type: 'combine',
+  inputs: [{
+    type: 'float',
+    name: 'amount',
+    default: 1
+  }],
+  glsl: `   return _c0*(1.0-amount) + (1.0-(1.0-_c0)*(1.0-_c1))*amount;`
 }, {
   name: 'modulate',
   type: 'combineCoord',
