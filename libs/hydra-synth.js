@@ -2400,14 +2400,19 @@ var _default = () => [{
     type: 'float',
     name: 'smoothness',
     default: 0
+  }, {
+    type: 'float',
+    name: 'amount',
+    default: 1
   }],
-  glsl: `   vec2 st = _st;
+  glsl: `   if (amount == 0.0) return _st;
+   vec2 st = _st;
    st -= 0.5;
    float r = length(st);
    float pi = 2.*3.1416;
    float a = atan(st.y, st.x) + pi/(2.*nSides);
    a = abs(asin(sin(a*nSides*0.5)/(smoothness+1.0))) * 2.0/nSides;
-   return r*vec2(cos(a), sin(a));`
+   return mix(_st, r*vec2(cos(a), sin(a)), amount);`
 }, {
   name: 'modulateKaleid',
   type: 'combineCoord',
