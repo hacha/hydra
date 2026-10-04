@@ -24,16 +24,23 @@ export default class Editor extends Component {
    // hacky, maybe not necessary
    this.innerText = document.getElementsByClassName('CodeMirror')[0]
    this.innerText.style.transition = 'opacity 0.5s'
+   // apply visibility requested before load (update can run before the element is mounted)
+   if (this.visible === false) this.hide()
+   else this.show()
   }
 
   hide() {
-    this.innerText.style.opacity = 0
+    this.visible = false
+    if (this.innerText) this.innerText.style.opacity = 0
     this.logElement.style.opacity = 0
   }
 
   show() {
-    this.innerText.style.opacity = 1
-    this.innerText.style.pointerEvents = 'all'
+    this.visible = true
+    if (this.innerText) {
+      this.innerText.style.opacity = 1
+      this.innerText.style.pointerEvents = 'all'
+    }
     this.logElement.style.opacity = 1
   }
 
