@@ -1,13 +1,30 @@
-import { defineConfig } from 'vite'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import { defineConfig, loadEnv, searchForWorkspaceRoot } from 'vite'
 import { createHtmlPlugin } from 'vite-plugin-html'
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url))
+// sibling hydra-synth checkout (../hydra-synth). dev ではあればこちらを優先し、
+// 無ければ同梱の public/libs/hydra-synth.js (npm run sync-hydra-synth で更新) を使う。
+const localHydraSynthDir = path.resolve(projectRoot, '../hydra-synth/dist')
+const localHydraSynthFile = path.join(localHydraSynthDir, 'hydra-synth.js')
+const hasLocalHydraSynth = fs.existsSync(localHydraSynthFile)
 
 export default defineConfig(({ mode }) => {
     const isDevelopment = mode === 'development'
 
     // Default URLs based on environment
+    const cdnHydraSynthUrl = 'https://cdn.jsdelivr.net/npm/hydra-synth/dist/hydra-synth.js'
     const defaultHydraSynthUrl = isDevelopment
-        ? '/libs/hydra-synth.js'
-        : 'https://cdn.jsdelivr.net/npm/hydra-synth/dist/hydra-synth.js'
+        ? (hasLocalHydraSynth ? '/@fs/' + localHydraSynthFile.replace(/\\/g, '/').replace(/^\//, '') : '/libs/hydra-synth.js')
+        : cdnHydraSynthUrl
+
+    // index.html の %VITE_HYDRA_SYNTH_URL% は Vite が env から置換するので、
+    // .env.* で未指定なら上の既定値を env に流し込む (process.env は .env より優先される)
+    if (isDevelopment && !process.env.VITE_HYDRA_SYNTH_URL && !loadEnv(mode, projectRoot, 'VITE_').VITE_HYDRA_SYNTH_URL) {
+        process.env.VITE_HYDRA_SYNTH_URL = defaultHydraSynthUrl
+    }
 
     const defaultP5Url = isDevelopment
         ? '/libs/p5.min.js'
@@ -33,7 +50,10 @@ export default defineConfig(({ mode }) => {
         server: {
             port: parseInt(process.env.VITE_PORT || '5173'),
             strictPort: true,
-            host: true
+            host: true,
+            fs: {
+                allow: [searchForWorkspaceRoot(projectRoot), localHydraSynthDir]
+            }
         },
         plugins: [
             createHtmlPlugin({

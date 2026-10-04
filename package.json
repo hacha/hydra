@@ -8,7 +8,8 @@
     "build": "vite build",
     "dev": "vite . --host ",
     "publish": "gh-pages -d dist",
-    "share-session": "node share-session.mjs"
+    "share-session": "node share-session.mjs",
+    "sync-hydra-synth": "node sync-hydra-synth.mjs"
   },
   "author": "",
   "license": "AGPL",
