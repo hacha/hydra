@@ -194,7 +194,7 @@ node share-session.mjs hydra-session-foo.json
 - オーディオ再生・ドラム音源・`shush`(Ctrl+.) は廃止（視覚用途では不要なため）
 
 ### 開発環境
-- 開発時はローカルのhydra-synthファイルを参照するように設定
+- 開発時は `../hydra-synth/dist` があればそれを直接参照し、無ければ同梱の `public/libs/hydra-synth.js` を使う
 - 開発環境と本番環境でbaseパスを適切に切り替え
 - 環境変数による設定の柔軟化
 
@@ -216,8 +216,11 @@ node share-session.mjs hydra-session-foo.json
 # 開発サーバー（http://localhost:5173）
 npm run dev
 
-# 本番ビルド
+# 本番ビルド（prebuild で ../hydra-synth/dist の最新ビルドを public/libs/ に自動コピー。無ければ同梱版のまま）
 npm run build
+
+# 同梱の hydra-synth だけを手動で更新
+npm run sync-hydra-synth
 
 # GitHub Pagesへデプロイ
 npm run publish

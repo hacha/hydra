@@ -3194,6 +3194,8 @@ var _generatorFactory = _interopRequireDefault(require("./generator-factory.js")
 
 var _textSource = _interopRequireDefault(require("./text-source.js"));
 
+var _pick = _interopRequireDefault(require("./pick.js"));
+
 var _regl = _interopRequireDefault(require("regl"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
@@ -3282,6 +3284,8 @@ class HydraRenderer {
     this._generateGlslTransforms();
 
     this._initTextGenerator();
+
+    this._initPickGenerator();
 
     this.synth.screencap = () => {
       this.saveFrame = true;
@@ -3625,6 +3629,11 @@ class HydraRenderer {
     if (this.sandbox) this.sandbox.add('text');
   }
 
+  _initPickGenerator() {
+    this.synth.pick = (0, _pick.default)(buf => this.synth.src(buf));
+    if (this.sandbox) this.sandbox.add('pick');
+  }
+
   _render(output) {
     if (output) {
       this.output = output;
@@ -3699,7 +3708,7 @@ class HydraRenderer {
 var _default = HydraRenderer;
 exports.default = _default;
 
-},{"./eval-sandbox.js":10,"./generator-factory.js":13,"./hydra-source.js":17,"./lib/array-utils.js":20,"./lib/audio.js":21,"./lib/mouse.js":24,"./lib/video-recorder.js":27,"./output.js":29,"./text-source.js":30,"raf-loop":6,"regl":8}],19:[function(require,module,exports){
+},{"./eval-sandbox.js":10,"./generator-factory.js":13,"./hydra-source.js":17,"./lib/array-utils.js":20,"./lib/audio.js":21,"./lib/mouse.js":24,"./lib/video-recorder.js":27,"./output.js":29,"./pick.js":30,"./text-source.js":31,"raf-loop":6,"regl":8}],19:[function(require,module,exports){
 "use strict";
 
 var _hydraSynth = _interopRequireDefault(require("./hydra-synth.js"));
@@ -4812,6 +4821,133 @@ var _default = Output;
 exports.default = _default;
 
 },{}],30:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.PickState = void 0;
+exports.default = createPick;
+exports.toScene = void 0;
+
+var _arrayUtils = _interopRequireDefault(require("./lib/array-utils.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+// pick(index, fade, scene0, scene1, ...) - switch between scenes with a cross-fade.
+// Ported from Neodelic (PickState in ParamEvaluator.cs).
+//
+// pick is sugar for scene0.blend(scene1, w1).blend(scene2, w2)... where the weights are
+// solved on the CPU every frame. A blend chain lets later scenes overwrite earlier ones,
+// so a fade from i to j is "weight 1 for the lower index, progress (or 1 - progress) for
+// the higher one, 0 for the rest" - a cross-fade between just those two scenes.
+//
+// Progress accumulates from the beat delta, so evaluating the weights several times per
+// frame does not change the speed, and moving time backwards only pauses the fade.
+// beats in the same unit as one array step: time * bpm / 60
+const toBeats = ({
+  time,
+  bpm
+}) => time * bpm / 60;
+
+const evalParam = (param, props) => {
+  if (typeof param === 'function') return param(props);
+  if (Array.isArray(param)) return _arrayUtils.default.getValue(param)(props);
+  return param;
+}; // fraction is truncated, out of range is clamped to the ends, NaN is scene 0
+
+
+const toScene = (index, count) => {
+  if (!(index >= 1)) return 0;
+  if (index >= count - 1) return count - 1;
+  return Math.floor(index);
+};
+
+exports.toScene = toScene;
+
+class PickState {
+  constructor(index, fade, count) {
+    this.index = index;
+    this.fade = fade;
+    this.count = count;
+    this.from = 0;
+    this.to = 0;
+    this.progress = 1;
+    this.lastBeats = NaN;
+  } // weight for the blend of scene (1..count-1)
+
+
+  weight(scene, props) {
+    this.step(props);
+    if (this.progress >= 1) return scene === this.to ? 1 : 0;
+    const lo = Math.min(this.from, this.to);
+    const hi = Math.max(this.from, this.to);
+    if (scene === lo) return 1;
+    if (scene === hi) return this.to === hi ? this.progress : 1 - this.progress;
+    return 0;
+  }
+
+  step(props) {
+    const target = toScene(evalParam(this.index, props), this.count);
+    const beats = toBeats(props);
+
+    if (Number.isNaN(this.lastBeats)) {
+      // the first evaluation starts at the current scene without fading
+      this.from = this.to = target;
+      this.progress = 1;
+      this.lastBeats = beats;
+      return;
+    }
+
+    const fade = evalParam(this.fade, props);
+    const delta = beats - this.lastBeats;
+    this.lastBeats = beats;
+
+    if (this.progress < 1 && delta > 0) {
+      this.progress = fade > 0 ? Math.min(this.progress + delta / fade, 1) : 1;
+    }
+
+    if (target === this.to) return;
+
+    if (this.progress >= 1) {
+      this.from = this.to;
+      this.progress = 0;
+    } else if (target === this.from) {
+      // coming back: retrace from the current mix (the only interruption without a jump)
+      this.from = this.to;
+      this.progress = 1 - this.progress;
+    } else {
+      // three scenes cannot be mixed, so restart from the heavier one (the image jumps here)
+      this.from = this.progress >= 0.5 ? this.to : this.from;
+      this.progress = 0;
+    }
+
+    this.to = target;
+    if (!(fade > 0)) this.progress = 1;
+  }
+
+}
+
+exports.PickState = PickState;
+
+function createPick(src) {
+  return function pick(index, fade, ...scenes) {
+    if (scenes.length === 0) throw new Error('pick: needs at least one scene');
+    if (typeof fade === 'number' && fade < 0) throw new Error('pick: fade must not be negative');
+    if (fade === undefined) fade = 0; // a buffer name (o1, s0) is the same as src(o1)
+
+    scenes = scenes.map(scene => scene && scene.getTexture ? src(scene) : scene); // a constant index keeps only that scene
+
+    if (typeof index === 'number' || index === undefined) {
+      return scenes[toScene(index === undefined ? 0 : index, scenes.length)];
+    }
+
+    const state = new PickState(index, fade, scenes.length);
+    return scenes.slice(1).reduce((chain, scene, i) => chain.blend(scene, props => state.weight(i + 1, props)), scenes[0]);
+  };
+}
+
+},{"./lib/array-utils.js":20}],31:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {

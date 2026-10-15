@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "prebuild": "node sync-hydra-synth.mjs --optional",
     "build": "vite build",
     "dev": "vite . --host ",
     "publish": "gh-pages -d dist",
